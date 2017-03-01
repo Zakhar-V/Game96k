@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Scripts">
+      <UniqueIdentifier>{ccb0b8a4-cee4-4db5-80db-17471bbfdb50}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{cecbecde-e229-4bd2-aee3-68377ecaf385}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MakeData.bat">
+      <Filter>Scripts</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Common.glsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Generic-PS.glsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Generic-VS.glsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Quad-GS.glsl">
+      <Filter>Shaders</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

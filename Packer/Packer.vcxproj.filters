@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Packer">
+      <UniqueIdentifier>{09ce2006-3786-4898-951d-126c09d563fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LZ4">
+      <UniqueIdentifier>{e7c228f5-31ee-42bc-aeb4-2e89d4029397}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Packer.cpp">
+      <Filter>Packer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\LZ4\lz4.c">
+      <Filter>LZ4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\LZ4\lz4hc.c">
+      <Filter>LZ4</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\ThirdParty\LZ4\lz4.h">
+      <Filter>LZ4</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ThirdParty\LZ4\lz4hc.h">
+      <Filter>LZ4</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

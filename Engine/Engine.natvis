@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  
+  <Type Name="Array&lt;*&gt;">
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">m_size</Item>
+      <Item Name="[capacity]" ExcludeView="simple">m_capacity</Item>
+      <ArrayItems>
+        <Size>m_size</Size>
+        <ValuePointer>m_data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  
+  </Type>
+     <Type Name="ListIterator&lt;*&gt;">
+    <DisplayString>{m_ptr[0]}</DisplayString>
+  </Type>
+  
+  <!--Type Name="Reax::List&lt;*&gt;::Node">
+    <DisplayString>{m_value}</DisplayString>
+  </Type-->
+ 
+  <!--Type Name="List&lt;*&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <LinkedListItems>
+        <Size>m_size</Size>
+        <HeadPointer>m_tail.m_next</HeadPointer>
+        <NextPointer>m_next</NextPointer>
+        <ValueNode>m_value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type-->
+  
+  <Type Name="Pair&lt;*,*&gt;">
+    <DisplayString>{{{first}, {second}}}</DisplayString>
+    <Expand>
+      <Item Name="[first]" ExcludeView="simple">(first)</Item>
+      <Item Name="[second]" ExcludeView="simple">(second)</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="HashMap&lt;*,*&gt;::Node">
+    <DisplayString>{m_value}</DisplayString>
+  </Type>
+  
+  <Type Name="HashMap&lt;*,*&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+       <Item Name="[bucket count]" ExcludeView="simple">(m_numBuckets)</Item>
+     <LinkedListItems>
+        <Size>m_size</Size>
+        <HeadPointer>m_tail.m_next</HeadPointer>
+        <NextPointer>m_next</NextPointer>
+        <ValueNode>m_value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+
+  <Type Name="String;">
+    <DisplayString>{m_data,na}</DisplayString>
+    <StringView>m_data,na</StringView>
+    <Expand>
+      <Item Name="[length]" ExcludeView="simple">m_length</Item>
+      <Item Name="[capacity]" ExcludeView="simple">m_capacity</Item>
+      <ArrayItems IncludeView="expanded">
+        <Size>m_length</Size>
+        <ValuePointer>m_data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  
+  <Type Name="StringHash">
+    <DisplayString>{value}</DisplayString>
+  </Type>
+
+</AutoVisualizer>
