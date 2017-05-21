@@ -1,13 +1,20 @@
 #pragma once
 
 #include "Assets.hpp"
-#include "Resource.hpp"
+#include "Timer.hpp"
+#include "Thread.hpp"
 #include "Device.hpp"
 #include "Graphics.hpp"
 #include "Scene.hpp"
 #include "Renderer.hpp"
 #include "UI.hpp"
+#include "Physics.hpp"
+#include "Pathfinding.hpp"
 #include "Behavior.hpp"
+
+#include "Image.hpp"
+#include "Material.hpp"
+#include "Mesh.hpp"
 
 //----------------------------------------------------------------------------//
 // Defs
@@ -36,13 +43,20 @@ protected:
 	bool m_quit = false;
 	Reflection m_reflection; // Система рефлексии
 	Assets m_assets; // Загрузчик статических ассетов
-	ResourceManager m_resourceMgr; // Менеджер ресурсов
+	Timer m_timer; // Главный таймер
+	ThreadPool m_threads; // Пул потоков
 	Device m_device; // Окно, ввод и таймер
 	Graphics m_graphics; // Графическая система
-	//EntitySystem m_entityMgr; // Менеджер сущностей/компонентов
-	SceneManager m_sceneMgr; // Менеджер сцен
+
+	ImageManager m_imagehMgr;
+	MaterialManager m_materialhMgr;
+	MeshManager m_meshMgr;
+
+	Scene m_scene;
 	Renderer m_renderer; // Рендерер
 	UISystem m_ui;
+	PhysicsSystem m_physics;
+	Pathfinding m_pathfinding;
 	BehaviorSystem m_behavior;
 };
 

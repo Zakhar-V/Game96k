@@ -10,8 +10,10 @@
 
 #include "File.cpp"
 #include "Assets.cpp"
+#include "Thread.cpp"
 #include "Resource.cpp"
 
+#include "Timer.cpp"
 #include "Device.cpp"
 
 #include "OpenGL.cpp"
@@ -20,6 +22,7 @@
 #include "Image.cpp"
 
 #include "Scene.cpp"
+#include "Spatial.cpp"
 #include "Renderer.cpp"
 #include "UI.cpp"
 #include "Behavior.cpp"

@@ -3,36 +3,36 @@
 #include "Scene.hpp"
 #include "Renderer.hpp"
 
-
 //----------------------------------------------------------------------------//
 // Defs
 //----------------------------------------------------------------------------//
 
 #define gUISystem UISystem::Get()
 
+////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
-// UIElement
+// UIElement_
 //----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
 
-class UIElement	: public Component
+class GuiElement;
+class GuiFrame;
+class Window;
+class Scrollbar;
+class Dropdown;
+class Panel;
+class InputField;
+
+class Button
 {
-public:
-	RTTI("UIElement");
-
-	enum class ScalingMode
+	enum Type
 	{
-		Fixed, // Фиксированный размер
-		Relative, // Относительный размер
+		Default,
+		Toggle,
+		Checkbox,
 	};
-
-
-protected:
-	friend class UISystem;
-
-	Vector2 m_minAnchor = Vector2::Zero;
-	Vector2 m_maxAnchor = Vector2::One;
-	Vector2 m_pivot = .5f;
 };
+
 
 //----------------------------------------------------------------------------//
 // UISystem

@@ -207,6 +207,44 @@ const DepthState::Desc DepthState::Variants[] =
 };
 
 //----------------------------------------------------------------------------//
+// BlendState
+//----------------------------------------------------------------------------//
+
+const BlendState::Desc BlendState::Variants[] =
+{
+	{ false, true, BlendFactor::One, BlendFactor::Zero, BlendMode::Add }, // Default
+	//{ true, true, BlendFactor::SrcAlpha, BlendFactor::OneMinusSrcAlpha, BlendMode::Add }, // Translucent
+	{ true, true, BlendFactor::SrcAlpha, BlendFactor::OneMinusSrcAlpha, BlendMode::Add }, // Translucent
+};
+
+//----------------------------------------------------------------------------//
+// Vertex
+//----------------------------------------------------------------------------//
+
+const Vertex::Attrib Vertex::Format[] =
+{
+	// Vertex
+	{ GL_FLOAT, 3, false, (uint16)offsetof(Vertex, position), 0, 0 }, // 0
+	{ GL_HALF_FLOAT, 2, false, (uint16)offsetof(Vertex, texcoord), 0, 0 }, // 1
+	{ GL_UNSIGNED_BYTE, 4, true, (uint16)offsetof(Vertex, color), 0, 0 }, // 2
+	{ GL_BYTE, 4, true, (uint16)offsetof(Vertex, normal), 0, 0 }, // 3
+	{ GL_UNSIGNED_BYTE, 4, true, (uint16)offsetof(Vertex, tangent), 0, 0 }, // 4
+	{ GL_UNSIGNED_BYTE, 4, true, (uint16)offsetof(Vertex, weights), 0, 0 }, // 5
+	{ GL_UNSIGNED_BYTE, 4, false, (uint16)offsetof(Vertex, indices), 0, 0 }, // 6
+	{ GL_HALF_FLOAT, 2, false, (uint16)offsetof(Vertex, texcoord2), 0, 0 }, // 7
+	{ GL_FLOAT, 2, false, (uint16)offsetof(Vertex, size), 0, 0 },	// 8
+
+	// InstanceData
+	{ GL_FLOAT, 4, false, (uint16)offsetof(InstanceData, matrix.r[0]), 1, 1 }, // 9
+	{ GL_FLOAT, 4, false, (uint16)offsetof(InstanceData, matrix.r[1]), 1, 1 }, // 10
+	{ GL_FLOAT, 4, false, (uint16)offsetof(InstanceData, matrix.r[2]), 1, 1 }, // 11
+	{ GL_FLOAT, 4, false, (uint16)offsetof(InstanceData, params), 1, 1 }, // 12
+
+	// SkeletonLink
+	{ GL_INT, 1, false, (uint16)offsetof(SkeletonOffset, index), 2, 1 }, // 13
+};
+
+//----------------------------------------------------------------------------//
 // Buffer
 //----------------------------------------------------------------------------//
 
@@ -227,33 +265,34 @@ Buffer::~Buffer(void)
 	if(m_handle)
 		glDeleteBuffers(1, &m_handle);
 #ifdef _STATISTICS
-	gGraphics->stats.bufferMemory -= m_capacity;
+	gGraphics->stats.bufferMemory -= m_size;
 	gGraphics->stats.bufferCount--;
 #endif
 }
 //----------------------------------------------------------------------------//
-void Buffer::Realloc(uint _newSize, const void* _data)
+void Buffer::Realloc(uint _newSize, const void* _data, bool _discard)
 {
 	GL_DEBUG();
+
+	if (_discard && _data)
+	{
+		// https://www.khronos.org/opengl/wiki/Buffer_Object_Streaming
+		Realloc(_newSize, nullptr, false);
+		Write(_data, 0, _newSize);
+		return;
+	}
 
 	if (!_newSize && _data)
 		_data = nullptr;
 
-	if (m_capacity < _newSize || (m_usage == BufferUsage::Static && m_capacity != _newSize))
-	{
 #ifdef _STATISTICS
-	gGraphics->stats.bufferMemory -= m_capacity;
+	gGraphics->stats.bufferMemory -= m_size;
 	gGraphics->stats.bufferMemory += _newSize;
 	if(_data)
 		gGraphics->stats.frame.bufferWrite += _newSize;
 #endif
-		glNamedBufferDataEXT(m_handle, _newSize, _data, (uint16)m_usage);
-		m_capacity = _newSize;
-	}
-	else if (_data)
-	{
-		Write(_data, 0, _newSize);
-	}
+
+	glNamedBufferDataEXT(m_handle, _newSize, _data, (uint16)m_usage);
 	m_size = _newSize;
 }
 //----------------------------------------------------------------------------//
@@ -314,24 +353,48 @@ void Buffer::Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size)
 	glNamedCopyBufferSubDataEXT(_src->m_handle, m_handle, _srcOffset, _dstOffset, _size);
 }
 //----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Vertex
-//----------------------------------------------------------------------------//
-
-const Vertex::Attrib Vertex::Format[] =
+void Buffer::ClearStream(bool _invalidate)
 {
-	{ GL_FLOAT, 3, false, offsetof(Vertex, position) },
-	{ GL_HALF_FLOAT, 2, false, offsetof(Vertex, texcoord) },
-	{ GL_UNSIGNED_BYTE, 4, true, offsetof(Vertex, color) },
-	{ GL_BYTE, 4, true, offsetof(Vertex, normal) },
-	{ GL_UNSIGNED_BYTE, 4, true, offsetof(Vertex, tangent) },
-	{ GL_UNSIGNED_BYTE, 4, true, offsetof(Vertex, weights) },
-	{ GL_UNSIGNED_BYTE, 4, false, offsetof(Vertex, indices) },
-	{ GL_HALF_FLOAT, 2, false, offsetof(Vertex, texcoord2) },
-	{ GL_FLOAT, 2, false, offsetof(Vertex, size) },
-	{ GL_FLOAT, 1, false, offsetof(Vertex, rotation) },
-};
+	if(_invalidate)
+		m_uploaded = false;
+	m_streamData.Clear();
+}
+//----------------------------------------------------------------------------//
+void Buffer::InvalidateStream(void)
+{
+	m_uploaded = false;
+}
+//----------------------------------------------------------------------------//
+uint8* Buffer::ReallocStreamData(uint _size)
+{
+	m_uploaded = false;
+	m_streamData.Resize(_size);
+	return m_streamData.Data();
+}
+//----------------------------------------------------------------------------//
+uint8* Buffer::AppendStreamData(uint _size)
+{
+	uint _offset = m_streamData.Size();
+	m_uploaded = false;
+	m_streamData.Resize(_offset + _size);
+	return m_streamData.Data() + _offset;
+}
+//----------------------------------------------------------------------------//
+void Buffer::AppendStreamData(const void* _data, uint _size)
+{
+	m_uploaded = false;
+	m_streamData.Push(reinterpret_cast<const uint8*>(_data), _size);
+}
+//----------------------------------------------------------------------------//
+void Buffer::UploadStream(void)
+{
+	if (!m_uploaded)
+	{
+		m_uploaded = true;
+		Realloc(m_streamData.Size(), m_streamData.Data(), true);
+	}
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // PixelFormat
@@ -394,7 +457,7 @@ Texture::~Texture(void)
 //----------------------------------------------------------------------------//
 void Texture::Init(TextureType::Enum _type, PixelFormat::Enum _format, int _lods)
 {
-	if (m_type == _type && m_format == _format && m_desiredLods == _lods) // no changes
+	if (m_type == _type && m_format == _format && m_desiredLods == _lods && m_initialized) // no changes
 		return;
 
 	m_type = _type;
@@ -421,9 +484,11 @@ void Texture::Realloc(uint _width, uint _height, uint _depth)
 	m_width = _width;
 	m_height = _height;
 	m_depth = _depth;
+	m_invSize.x = m_width > 0 ? (1.f / m_width) : 0;
+	m_invSize.y = m_height > 0 ? (1.f / m_height) : 0;
 
 	uint _side = Max(m_width, m_height);
-	uint _maxLods = _side ? Log2i(_side) + 1 : 1;
+	uint _maxLods = _side ? Log2i(_side) : 1;
 	m_lods = (m_desiredLods < 0) ? _maxLods : Clamp<uint>(m_desiredLods, 1, _maxLods);
 	uint _iformat = PixelFormat::GLFormats[m_format].iformat;
 	uint _target = TextureType::GLTypes[m_type];
@@ -482,6 +547,13 @@ void Texture::GenerateMipmap(void)
 		glGenerateTextureMipmapEXT(m_handle, TextureType::GLTypes[m_type]);
 }
 //----------------------------------------------------------------------------//
+const Rect& Texture::GetRect(Texture* _texture, uint _index)
+{
+	if (_texture && _index < _texture->m_atlas.Size())
+		return _texture->m_atlas[_index];
+	return Rect::Identity;
+}
+//----------------------------------------------------------------------------//
 void Texture::_CreateHandle()
 {
 	GL_DEBUG();
@@ -513,11 +585,13 @@ void Texture::_Bind(uint _slot, Texture* _texture)
 {
 	GL_DEBUG();
 
-	uint _target, _handle;
+	uint _target = GL_TEXTURE_2D;
+	uint _handle = 0;
 	if (_texture)
-		_target = TextureType::GLTypes[_texture->m_type], _handle = _texture->m_handle;
-	else
-		_target = GL_TEXTURE_2D, _handle = 0;
+	{
+		_target = TextureType::GLTypes[_texture->m_type];
+		_handle = _texture->m_handle;
+	}
 	glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
 }
 //----------------------------------------------------------------------------//
@@ -662,10 +736,10 @@ void RenderBuffer::_BindRenderTargetTexture(uint _framebuffer, uint _attachment,
 
 	if (_texture)
 	{
-		uint _target = _texture->TexType() == TextureType::Cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _z : TextureType::GLTypes[_texture->TexType()];
-		if (_texture->TexType() == TextureType::Volume)
+		uint _target = _texture->Type() == TextureType::Cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _z : TextureType::GLTypes[_texture->Type()];
+		if (_texture->Type() == TextureType::Volume)
 			glNamedFramebufferTexture3DEXT(_framebuffer, _attachment, _target, _texture->_Handle(), 0, _z);
-		else if (_texture->TexType() == TextureType::Array)
+		else if (_texture->Type() == TextureType::Array)
 			glNamedFramebufferTextureLayerEXT(_framebuffer, _attachment, _texture->_Handle(), 0, _z);
 		else
 			glNamedFramebufferTexture2DEXT(_framebuffer, _attachment, _target, _texture->_Handle(), 0);
@@ -681,31 +755,30 @@ void RenderBuffer::_BindRenderTargetTexture(uint _framebuffer, uint _attachment,
 
 const char* Shader::Defines[] =
 {
-	"INSTANCED", // Instanced
+	// VS/GS
 	"SKINNED", // Skinned
 	"SPRITE", // Sprite
 	"BILLBOARD", // Billboard
 	"BILLBOARD_Y", // BillboardY
-	"PARTICLE", // Particle
-	"FSQUAD", // FSQuad
-	"TEXTURE", // Texture
+	"TERRAIN", // Terrain
+
+	// PS
+	"ALBEDO", // Albedo
 };
 
 const Shader::Desc Shader::Variants[__Count] =
 {
-	{ Vertex, GLSL_GenericVS, Instanced }, // VS_StaticModel
+	{ Vertex, GLSL_GenericVS, 0 }, // VS_StaticModel
 	{ Vertex, GLSL_GenericVS, Skinned }, // VS_SkinnedModel
-	{ Vertex, GLSL_GenericVS, Sprite }, // VS_Sprites
-	{ Vertex, GLSL_GenericVS, Particle }, // VS_Particles
-	{ Vertex, GLSL_GenericVS, FSQuad }, // VS_FSQuad
+	{ Vertex, GLSL_GenericVS, Sprite }, // VS_Sprite
+	{ Vertex, GLSL_GenericVS, Terrain }, // VS_Terrain
 
 	{ Geometry, GLSL_QuadGS, Sprite }, // GS_Sprite
 	{ Geometry, GLSL_QuadGS, Billboard }, // GS_Billboard
 	{ Geometry, GLSL_QuadGS, BillboardY }, // GS_BillboardY
-	{ Geometry, GLSL_QuadGS, Particle }, // GS_Particles
 
-	{ Pixel, GLSL_GenericPS, 0 }, // PS_NoTexture
-	{ Pixel, GLSL_GenericPS, Texture }, // PS_Texture
+	{ Pixel, GLSL_GenericPS, 0 }, // PS_Default
+	{ Pixel, GLSL_GenericPS, Albedo }, // PS_Texture
 };
 
 const uint16 Shader::GLTypes[__NumTypes] =
@@ -812,9 +885,9 @@ const ShaderParam::Desc ShaderParam::Variants[__Count] =
 {
 	{ 0, 0 }, // Unused
 	{ 1, sizeof(UCamera) }, // Camera
-	{ MAX_INSTANCES, sizeof(Matrix44) }, // InstanceMatrices
-	{ MAX_INSTANCES, sizeof(Matrix24) }, // InstanceParams
-	{ MAX_BONES, sizeof(Matrix44) }, // BoneMatrices
+	//{ MAX_INSTANCES, sizeof(Matrix44) }, // InstanceMatrices
+	//{ MAX_INSTANCES, sizeof(Matrix24) }, // InstanceParams
+	//{ MAX_BONES, sizeof(Matrix44) }, // BoneMatrices
 	{ 1, sizeof(URasterizerParams) }, // RasterizerParams
 };
 
@@ -829,7 +902,7 @@ void ShaderParam::_Init(uint _elementCount, uint _elementSize)
 	uint _size = _elementSize * _elementCount;
 	m_data = new uint8[_size];
 	m_buffer = new Buffer(BufferUsage::Dynamic);
-	m_buffer->Realloc(_size);
+	//m_buffer->Realloc(_size);
 
 	m_size = _elementCount;
 	m_elementSize = _elementSize;
@@ -864,9 +937,7 @@ void ShaderParam::_Flush(void)
 	gGraphics->stats.frame.spUploaded += m_changed;
 #endif
 
-	//memcpy(m_buffer->Map(LockMode::WriteDiscardUnsynchronized, 0, m_changed), m_data, m_changed);
-	//m_buffer->Unmap();
-	m_buffer->Write(m_data, 0, m_changed);
+	m_buffer->Realloc(m_changed, m_data, true);
 	Unlink(s_changedParams, this, m_prev);
 	m_changed = 0;
 }
@@ -986,6 +1057,9 @@ Graphics::Graphics(void)
 	// depth/stencil
 	m_currentStencilRef = 0;
 
+	// blend
+	// ...
+
 	// geometry
 	{
 		GL_DEBUG("init geometry");
@@ -996,7 +1070,6 @@ Graphics::Graphics(void)
 	// textures
 	{
 		memset(m_currentTextures, 0, sizeof(m_currentTextures));
-		gResources->RegisterType<Texture>();
 	}
 
 	// samplers
@@ -1046,9 +1119,6 @@ Graphics::Graphics(void)
 		}
 
 		const_cast<UCamera*>(Camera) = reinterpret_cast<UCamera*>(m_shaderParams[ShaderParam::Camera].m_data);
-		const_cast<Matrix44*>(InstanceMatrices) = reinterpret_cast<Matrix44*>(m_shaderParams[ShaderParam::InstanceMatrices].m_data);
-		const_cast<Matrix24*>(InstanceParams) = reinterpret_cast<Matrix24*>(m_shaderParams[ShaderParam::InstanceParams].m_data);
-		const_cast<Matrix44*>(BoneMatrices) = reinterpret_cast<Matrix44*>(m_shaderParams[ShaderParam::BoneMatrices].m_data);
 		const_cast<URasterizerParams*>(RasterizerParams) = reinterpret_cast<URasterizerParams*>(m_shaderParams[ShaderParam::RasterizerParams].m_data);
 	}
 
@@ -1082,7 +1152,7 @@ EventResult Graphics::_OnEvent(int _type, void* _data)
 {
 	switch (_type)
 	{
-	case ET_BeginFrame:
+	case SystemEvent::BeginFrame:
 	{
 		_ResetState();
 #ifdef _STATISTICS
@@ -1091,7 +1161,7 @@ EventResult Graphics::_OnEvent(int _type, void* _data)
 
 	} break;
 
-	case ET_EndFrame:
+	case SystemEvent::EndFrame:
 	{
 		wglSwapIntervalEXT(0); // TODO: VSync
 
@@ -1123,19 +1193,32 @@ void Graphics::_ResetState(void)
 	m_currentDepthState = nullptr;
 	SetDepthState(DepthState::Default);
 
+	// blend
+	m_currentBlendState = nullptr;
+	SetBlendState(BlendState::Default);
+
 	// geometry
 	glBindVertexArray(m_vertexArray);
 	m_currentVertexBuffer = nullptr;
+	m_currentInstanceData = nullptr;
+	m_currentSkeletonOffset = nullptr;
 	m_currentIndexBuffer = nullptr;
+	m_currentInstanceDataBufferBase = (uint)-1;
+	m_currentSkeletonOffsetBufferBase = (uint)-1;
 
 	// vertex format
 	for (uint i = 0; i < sizeof(Vertex::Format) / sizeof(Vertex::Attrib); ++i)
 	{
 		const Vertex::Attrib& _attrib = Vertex::Format[i];
-		glVertexAttribBinding(i, 0);
-		glEnableVertexAttribArray(i);
+		glVertexAttribBinding(i, _attrib.stream);
 		glVertexAttribFormat(i, _attrib.components, _attrib.format, _attrib.normalized, _attrib.offset);
+		if(i < 9)
+			glEnableVertexAttribArray(i);
 	}
+	glVertexBindingDivisor(1, 1); // InstanceData
+	glVertexBindingDivisor(2, 1); // SkeletonOffset
+	_SetDefaultInstanceData();
+	_SetDefaultSkeletonOffset();
 
 	// textures/samplers
 	ResetTextureUnits();
@@ -1151,10 +1234,45 @@ void Graphics::_ResetState(void)
 	glUseProgramStages(m_shaderPipeline, GL_VERTEX_SHADER_BIT | GL_FRAGMENT_SHADER_BIT | GL_GEOMETRY_SHADER_BIT, 0);
 }
 //----------------------------------------------------------------------------//
-void Graphics::_FlushUniforms(void)
+void  Graphics::_BeforeDraw(uint _baseInstance)
 {
+	GL_DEBUG();
+
 	while (ShaderParam::s_changedParams)
 		ShaderParam::s_changedParams->_Flush();
+
+	if (m_baseInstanceIdLoc >= 0)
+		glProgramUniform1i(m_currentShader[Shader::Vertex], m_baseInstanceIdLoc, _baseInstance);
+
+	if (m_currentVertexBuffer)
+		m_currentVertexBuffer->UploadStream();
+
+	if (m_currentIndexBuffer)
+		m_currentIndexBuffer->UploadStream();
+
+	if (m_currentInstanceData)
+	{
+		m_currentInstanceData->UploadStream();
+
+		if (m_currentInstanceDataBufferBase != _baseInstance)
+		{
+			m_currentInstanceDataBufferBase = _baseInstance;
+			glBindVertexBuffer(1, m_currentInstanceData->m_handle, sizeof(InstanceData) * _baseInstance, sizeof(InstanceData));
+		}
+	}
+
+	if (m_currentSkeletonOffset)
+	{
+		m_currentSkeletonOffset->UploadStream();
+
+		if (m_currentSkeletonOffsetBufferBase != _baseInstance)
+		{
+			m_currentSkeletonOffsetBufferBase = _baseInstance;
+			glBindVertexBuffer(2, m_currentSkeletonOffset->m_handle, sizeof(SkeletonOffset) * _baseInstance, sizeof(SkeletonOffset));
+		}
+	}
+
+	TODO("Upload SkeletonData");
 }
 //----------------------------------------------------------------------------//
 void Graphics::SetDepthState(DepthState::ID _id, uint _stencilRef)
@@ -1186,6 +1304,31 @@ void Graphics::SetDepthState(DepthState::ID _id, uint _stencilRef)
 	}
 }
 //----------------------------------------------------------------------------//
+void Graphics::SetBlendState(BlendState::ID _id)
+{
+	GL_DEBUG();
+	ASSERT(_id < BlendState::__Count);
+
+	const BlendState::Desc* _state = &BlendState::Variants[_id];
+	if (m_currentBlendState != _state)
+	{
+		m_currentBlendState = _state;
+		
+		if (_state->blendEnabled)
+		{
+			glEnable(GL_BLEND);
+			glBlendFunc(_state->src, _state->dst);
+			glBlendEquation(_state->mode);
+			//glBlendColor(_color.r, _color.g, _color.b, _color.a);
+		}
+		else
+		{
+			glDisable(GL_BLEND);
+		}
+		glColorMask(_state->colorWrite, _state->colorWrite, _state->colorWrite, _state->colorWrite);
+	}
+}
+//----------------------------------------------------------------------------//
 void Graphics::SetVertexBuffer(Buffer* _buffer)
 {
 	GL_DEBUG();
@@ -1208,18 +1351,99 @@ void Graphics::SetIndexBuffer(Buffer* _buffer)
 	}
 }
 //----------------------------------------------------------------------------//
-void Graphics::ResetTextureUnits(void)
+void Graphics::SetInstanceData(Buffer* _buffer)
 {
-	for (uint i = 0; i < MAX_TEXTURE_UNITS; ++i)
+	GL_DEBUG();
+
+	if (m_currentInstanceData != _buffer)
 	{
-		SetTexture(i, nullptr);
-		SetSampler(i, Sampler::Default);
+		if (_buffer)
+		{
+			//glBindVertexBuffer(1, _buffer->m_handle, 0, sizeof(InstanceData));
+			m_currentInstanceDataBufferBase = (uint)-1;
+			if (!m_currentInstanceData)
+			{
+				for (uint i = 9; i < 13; ++i)
+					glEnableVertexAttribArray(i); // 9, 10, 11, 12
+			}
+		}
+		else
+			_SetDefaultInstanceData();
+
+		m_currentInstanceData = _buffer;
 	}
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetTexture(uint _slot, Texture* _texture)
+void Graphics::SetSkeletonOffset(Buffer* _buffer)
+{
+	GL_DEBUG();
+
+	if (m_currentSkeletonOffset != _buffer)
+	{
+		if (_buffer)
+		{
+			//glBindVertexBuffer(2, _buffer->m_handle, 0, sizeof(SkeletonOffset));
+			m_currentSkeletonOffsetBufferBase = (uint)-1;
+			if (!m_currentSkeletonOffset)
+				glEnableVertexAttribArray(13);
+		}
+		else
+			_SetDefaultSkeletonOffset();
+
+		m_currentSkeletonOffset = _buffer;
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::_SetDefaultInstanceData(void)
+{
+	GL_DEBUG();
+
+	glBindVertexBuffer(1, 0, 0, sizeof(InstanceData));
+
+	for (uint i = 9; i < 13; ++i)
+		glDisableVertexAttribArray(i);
+
+	// default value
+	InstanceData _data;
+	glVertexAttrib4fv(9, _data.matrix.r[0].v);
+	glVertexAttrib4fv(10, _data.matrix.r[1].v);
+	glVertexAttrib4fv(11, _data.matrix.r[2].v);
+	glVertexAttrib4fv(12, _data.params.v);
+}
+//----------------------------------------------------------------------------//
+void Graphics::_SetDefaultSkeletonOffset(void)
+{
+	GL_DEBUG();
+
+	glBindVertexBuffer(2, 0, 0, sizeof(SkeletonOffset));
+	glDisableVertexAttribArray(13);
+
+	// default value
+	int _v[4] = { 0, 0, 0, 0 };
+	glVertexAttrib4iv(13, _v);
+}
+//----------------------------------------------------------------------------//
+void Graphics::ResetTextureUnits(void)
+{
+	GL_DEBUG();
+
+	memset(m_currentTextures, 0, sizeof(m_currentTextures));
+	memset(m_currentSamplers, 0, sizeof(m_currentSamplers));
+
+	for (uint i = 0; i <= MAX_TEXTURE_UNITS; ++i)
+	{
+		//SetTexture(i, nullptr);
+		//SetSampler(i, Sampler::Default);
+		glBindMultiTextureEXT(GL_TEXTURE0 + i, GL_TEXTURE_2D, 0);
+		glBindSampler(i, m_samplers[Sampler::Default].m_handle);
+	}
+}
+//----------------------------------------------------------------------------//
+__declspec(noinline )void Graphics::SetTexture(uint _slot, Texture* _texture)
 {
 	ASSERT(_slot < MAX_TEXTURE_UNITS);
+
+	glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, 1);
 
 	if (m_currentTextures[_slot] != _texture)
 	{
@@ -1240,6 +1464,18 @@ void Graphics::SetSampler(uint _slot, Sampler::ID _id)
 	{
 		m_currentSamplers[_slot] = _sampler;
 		glBindSampler(_slot, _sampler->m_handle);
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetViewport(const IntRect& _viewport)
+{
+	if (m_drawToFramebuffer)
+	{
+		glViewport(_viewport.left, _viewport.top, _viewport.Width(), _viewport.Height());
+	}
+	else
+	{
+		glViewport(_viewport.left, (int)gDevice->Height() - _viewport.bottom, _viewport.Width(), _viewport.Height());
 	}
 }
 //----------------------------------------------------------------------------//
@@ -1397,7 +1633,7 @@ void Graphics::SetShader(Shader::ID _id)
 	else
 	{
 		_handle = 0;
-		_type = Shader::__NumTypes - (_id - Shader::__Count);
+		_type = (_id - Shader::__Count);
 	}
 
 	ASSERT(_type < Shader::__NumTypes);
@@ -1406,6 +1642,9 @@ void Graphics::SetShader(Shader::ID _id)
 	{
 		m_currentShader[_type] = _handle;
 		glUseProgramStages(m_shaderPipeline, 1 << _type, _handle);
+
+		if (_type == Shader::Vertex)
+			m_baseInstanceIdLoc = _handle ? glGetUniformLocation(_handle, "BaseInstanceID") : -1;
 	}
 }
 //----------------------------------------------------------------------------//
@@ -1415,58 +1654,32 @@ void Graphics::Invalidate(ShaderParam::ID _id, uint _numElements)
 	m_shaderParams[_id]._Invalidate(_numElements);
 }
 //----------------------------------------------------------------------------//
-void Graphics::Draw(PrimitiveType::Enum _type, uint _start, uint _count, uint _numInstances)
+void Graphics::Draw(PrimitiveType::Enum _type, uint _start, uint _count, uint _numInstances, uint _baseInstance)
 {
 	GL_DEBUG();
 	ASSERT(m_currentVertexBuffer != nullptr);
 
-	_FlushUniforms();
+	_BeforeDraw(_baseInstance);
+
 	glDrawArraysInstanced(PrimitiveType::GLTypes[_type], _start, _count, _numInstances);
 
 #ifdef _STATISTICS
-	stats.frame.drawCalls++;
-	stats.frame.drawInstances += _numInstances;
-	stats.frame.drawVertices += _count * _type * _numInstances;
-	switch (_type)
-	{
-	case PrimitiveType::Points:
-		stats.frame.drawPoints += _count * _numInstances;
-		break;
-	case PrimitiveType::Lines:
-		stats.frame.drawLines += _count * _numInstances;
-		break;
-	case PrimitiveType::Triangles:
-		stats.frame.drawTriangles += _count * _numInstances;
-		break;
-	}
+	_AddDrawCall(_type, _count, _numInstances);
 #endif
 }
 //----------------------------------------------------------------------------//
-void Graphics::DrawIndexed(PrimitiveType::Enum _type, uint _baseVertex, uint _start, uint _count, uint _numInstances)
+void Graphics::DrawIndexed(PrimitiveType::Enum _type, uint _baseVertex, uint _start, uint _count, uint _numInstances, uint _baseInstance)
 {
 	GL_DEBUG();
 	ASSERT(m_currentVertexBuffer != nullptr);
 	ASSERT(m_currentIndexBuffer != nullptr);
 
-	_FlushUniforms();
+	_BeforeDraw(_baseInstance);
+
 	glDrawElementsInstancedBaseVertex(PrimitiveType::GLTypes[_type], _count, GL_UNSIGNED_SHORT, (const void*)(_start * sizeof(uint16)), _numInstances, _baseVertex);
 
 #ifdef _STATISTICS
-	stats.frame.drawCalls++;
-	stats.frame.drawInstances += _numInstances;
-	stats.frame.drawVertices += _count * _type * _numInstances;
-	switch (_type)
-	{
-	case PrimitiveType::Points:
-		stats.frame.drawPoints += _count * _numInstances;
-		break;
-	case PrimitiveType::Lines:
-		stats.frame.drawLines += _count * _numInstances;
-		break;
-	case PrimitiveType::Triangles:
-		stats.frame.drawTriangles += _count * _numInstances;
-		break;
-	}
+	_AddDrawCall(_type, _count, _numInstances);
 #endif
 }
 //----------------------------------------------------------------------------//

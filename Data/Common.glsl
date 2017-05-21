@@ -33,13 +33,22 @@ INOUT(4, vec4, Tangent);
 IN(5, vec4, Weights);
 IN(6, vec4, Indices);
 INOUT(7, vec2, TexCoord2);
-INOUT(8, vec2, Size);
-INOUT(9, float, Rot);
-OUT(10, vec4, WorldPos);
-OUT(11, vec3, Binormal);
-OUT_FLAT(12, int, InstanceID);
-OUT(13, float, LogZ);
+INOUT(8, vec3, Size);
+IN(9, vec4, InstanceMat1);
+IN(10, vec4, InstanceMat2);
+IN(11, vec4, InstanceMat3);
+IN(12, vec4, InstanceParams);
+IN(13, int, FirstBone);
+
+OUT(5, vec4, InstanceParams);
+OUT(6, vec4, WorldPos);
+OUT(9, vec3, Binormal);
+OUT_FLAT(10, int, InstanceID);
+OUT(11, float, LogZ);
+OUT(12, mat4, WorldMat); // 13-16
+
 out _PerVertex;
+uniform int BaseInstanceID;
 #endif  
 
 #ifdef COMPILE_GS
@@ -48,13 +57,15 @@ INOUT(1, vec2, TexCoord);
 INOUT(2, vec4, Color);
 INOUT(3, vec3, Normal);
 INOUT(4, vec4, Tangent);
+INOUT(5, vec4, InstanceParams);
+INOUT(6, vec4, WorldPos);
 IN(7, vec2, TexSize);
-IN(8, vec2, Size);
-IN(9, float, Rot);
-INOUT(10, vec4, WorldPos);
-INOUT(11, vec3, Binormal);
-INOUT_FLAT(12, int, InstanceID);
-OUT(13, float, LogZ);
+IN(8, vec3, Size);
+INOUT(9, vec3, Binormal);
+INOUT_FLAT(10, int, InstanceID);
+OUT(11, float, LogZ);
+IN(12, mat4, WorldMat);
+
 in _PerVertex gl_in[];
 out _PerVertex;
 #endif
@@ -64,10 +75,12 @@ IN(1, vec2, TexCoord);
 IN(2, vec4, Color);
 IN(3, vec3, Normal);
 IN(4, vec3, Tangent);
-IN(10, vec4, WorldPos);
-IN(11, vec3, Binormal);
-IN_FLAT(12, int, InstanceID);
-IN(13, float, LogZ);
+IN(5, vec4, InstanceParams);
+IN(6, vec4, WorldPos);
+IN(9, vec3, Binormal);
+IN_FLAT(10, int, InstanceID);
+IN(11, float, LogZ);
+
 OUT(0, vec4, Color);
 OUT(1, vec4, Normal);
 OUT(2, vec4, Material);
@@ -76,6 +89,7 @@ OUT(2, vec4, Material);
 #define UNIT_X vec3(1, 0, 0)
 #define UNIT_Y vec3(0, 1, 0)
 #define UNIT_Z vec3(0, 0, 1)
+#define VEC4_IDENTITY vec4(0, 0, 0, 1)
 
 #endif
 
@@ -92,7 +106,13 @@ UBUFFER(1, Camera)
 	vec2 InvScreenSize;
 };
 
-UBUFFER(2, InstanceMat)
+UBUFFER(2, RasterizerParams)
+{
+	float DepthBias; // default is 0 or 1e-5
+	float SilhouetteOffset;
+};
+
+/*UBUFFER(2, InstanceMat)
 {
 	layout(row_major) mat4 WorldMat[MAX_INSTANCES];
 };
@@ -105,10 +125,6 @@ UBUFFER(3, InstanceParams)
 UBUFFER(4, BoneMat)
 {
 	layout(row_major) mat4 BoneMat[MAX_BONES];
-};
+};*/
 
-UBUFFER(5, RasterizerParams)
-{
-	float DepthBias; // default is 0 or 1e-5
-	float SilhouetteOffset;
-};
+

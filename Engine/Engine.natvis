@@ -74,4 +74,40 @@
     <DisplayString>{value}</DisplayString>
   </Type>
 
+
+  <!-- MATH TYPES -->
+    
+      
+  <Type Name="Vector3">
+    <DisplayString>{{{x}, {y}, {z}}}</DisplayString>
+  </Type>
+
+  
+  <!-- DCEL -->
+  
+  <Type Name="Dcel::Vert">
+    <DisplayString>{{{idx}}}</DisplayString>
+  </Type>
+  <Type Name="Dcel::Edge">
+    <DisplayString>{{{vert->idx}, {twin->vert->idx}}}</DisplayString>
+    <Expand>
+      <Item Name="[edge]" ExcludeView="simple">*this</Item>
+      <Item Name="[prev]" ExcludeView="simple">prev</Item>
+      <Item Name="[next]" ExcludeView="simple">next</Item>
+      <Item Name="[twin]" ExcludeView="simple">twin</Item>
+    </Expand>
+  </Type>
+
+
+<!--Type Name="List&lt;*&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <LinkedListItems>
+        <Size>m_size</Size>
+        <HeadPointer>m_tail.m_next</HeadPointer>
+        <NextPointer>m_next</NextPointer>
+        <ValueNode>m_value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type-->
 </AutoVisualizer>

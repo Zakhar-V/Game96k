@@ -1,148 +1,66 @@
 #pragma once
 
 #include "Scene.hpp"
+#include "Timer.hpp"
 
 //----------------------------------------------------------------------------//
 // Component
 //----------------------------------------------------------------------------//
 
-
 //----------------------------------------------------------------------------//
-// Entity
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-Entity::Entity(void)
+void Component::Enable(bool _newState)
 {
-	
+	if (_newState)
+		m_enabled = true;
+	_Enable(_newState);
+	if (!_newState)
+		m_enabled = false;
 }
 //----------------------------------------------------------------------------//
-Entity::~Entity(void)
+bool Component::IsEnabled(void)
 {
-	ASSERT(m_scene == nullptr);
-
-	while (m_components)
-	{
-		Component* _component = m_components;
-		Unlink(m_components, _component, _component->m_prev);
-		_component->Release();
-	}
-
-	while (m_child)
-		m_child->SetParent(nullptr, false);
+	return m_enabled && m_entity->IsEnabled();
 }
 //----------------------------------------------------------------------------//
-bool Entity::IsInParentHierarchy(Entity* _parent)
+void Component::Destroy(void)
 {
-	if (_parent != nullptr)
-	{
-		for (Entity* _test = m_parent; _test; _test = _test->m_parent)
-		{
-			if (_test == _parent)
-				return true;
-		}
-	}
-	return false;
+	ASSERT(m_entity != nullptr);
+	m_entity->RemoveComponent(this);
 }
 //----------------------------------------------------------------------------//
-bool Entity::IsInChildHierarchy(Entity* _child)
+uint Component::GetTag(void)
 {
-	return _child && _child->IsInParentHierarchy(this);
+	return m_entity->GetTag();
 }
 //----------------------------------------------------------------------------//
-bool Entity::SetParent(Entity* _parent, bool _keepWorldTransform)
+bool Component::HasTag(uint _mask)
 {
-	if (m_parent == _parent)
-		return true;
-
-	if (_parent == this || IsInChildHierarchy(_parent))
-		return false;
-
-
-	if (!m_parent && !m_scene)
-		AddRef();
-
-	Matrix44 _worldTM;
-	if(_keepWorldTransform)
-		_worldTM = GetWorldTransform();
-
-	if (m_parent)
-	{
-		Unlink(m_parent->m_child, this, m_prev);
-	}
-	else if (m_scene)
-	{
-		m_scene->_RemoveRootEntity(this);
-	}
-
-	m_parent = _parent;
-
-	if (m_parent)
-	{
-		Link(m_parent->m_child, this, m_prev);
-		if(m_parent->m_scene != m_scene)
-			_SetScene(m_parent->m_scene);
-	}
-	else if (m_scene)
-	{
-		m_scene->_AddRootEntity(this);
-	}
-
-	if(_keepWorldTransform)
-		SetWorldTransform(_worldTM);
-
-	if (!m_parent && !m_scene)
-		Release();
-
-	return true;
+	return m_entity->HasTag(_mask);
 }
 //----------------------------------------------------------------------------//
-void Entity::_SetScene(Scene* _scene)
+bool Component::MatchTag(uint _mask)
 {
-	ASSERT(m_scene != _scene);
-	ASSERT(!m_parent || m_parent->m_scene == _scene);
-
-	if (!m_parent && !m_scene)
-		AddRef();
-
-	if (m_scene)
-	{
-		if (!m_parent)
-			m_scene->_RemoveRootEntity(this);
-	}
-
-	Scene* _oldScene = m_scene;
-	m_scene = _scene;
-
-	if (m_scene)
-	{
-		if(!m_parent)
-			m_scene->_AddRootEntity(this);
-	}
-
-	bool _isManaged = _oldScene && _oldScene->IsManaged();
-	if (m_scene && m_scene->IsManaged())
-	{
-		if (!_isManaged)
-			_RegisterComponents();
-	}
-	else if (_isManaged)
-	{
-		_UnregisterComponents();
-	}
-
-	for (Entity* i = m_child; i; i = i->m_next)
-	{
-		i->_SetScene(m_scene);
-	}
-
-	if (!m_parent && !m_scene)
-		Release();
+	return m_entity->MatchTag(_mask);
 }
 //----------------------------------------------------------------------------//
-Component* Entity::GetComponent(uint _type)
+uint Component::GetLayer(void)
 {
-	for (Component* i = m_components; i; i = i->m_next)
+	return m_entity->GetLayer();
+}
+//----------------------------------------------------------------------------//
+bool Component::HasLayer(uint _mask)
+{
+	return m_entity->HasLayer(_mask);
+}
+//----------------------------------------------------------------------------//
+bool Component::MatchLayer(uint _mask)
+{
+	return m_entity->MatchLayer(_mask);
+}
+//----------------------------------------------------------------------------//
+Component* Component::GetNextComponent(uint _type)
+{
+	for (Component* i = m_nextComponent; i; i = i->m_nextComponent)
 	{
 		if (i->IsTypeOf(_type))
 			return i;
@@ -150,57 +68,194 @@ Component* Entity::GetComponent(uint _type)
 	return nullptr;
 }
 //----------------------------------------------------------------------------//
-Component* Entity::AddComponent(uint _type)
+
+//----------------------------------------------------------------------------//
+// Entity
+//----------------------------------------------------------------------------//
+
+Entity* Entity::s_root = nullptr;
+
+//----------------------------------------------------------------------------//
+Entity::Entity(void)
 {
-	TypeInfo* _typeInfo = gReflection->GetTypeInfo(_type);
-	if (_typeInfo)
+}
+//----------------------------------------------------------------------------//
+Entity::~Entity(void)
+{
+	ASSERT(m_inScene == false);
+
+	while (m_components)
+		RemoveComponent(m_components);
+
+	while (m_child)
+		m_child->SetParent(nullptr, false);
+}
+//----------------------------------------------------------------------------//
+void Entity::Instantiate(void)
+{
+	if (!m_inScene && !m_parent)
 	{
-		if (_typeInfo->HasAnyOfFlags(Component::Single))
-		{
-			Component* _component = GetComponent(_type);
-			if (_component)
-				return _component;
-		}
+		AddRef();
+		_AddToScene(true);
+	}
+	DEBUG_CODE(else if (m_parent) LOG("Non-root entity cannot be instantiated"));
+}
+//----------------------------------------------------------------------------//
+void Entity::Destroy(void)
+{
+	SetParent(nullptr, false);
+	if (m_inScene)
+	{
+		_AddToScene(false);
+		Release();
+	}
+}
+//----------------------------------------------------------------------------//
+void Entity::_AddToScene(bool _newState)
+{
+	ASSERT(m_inScene != _newState);
+	ASSERT(!m_parent || m_parent->m_inScene == _newState);
 
-		ASSERT(_typeInfo->Factory != nullptr);
-		ComponentPtr _component = _typeInfo->Factory().Cast<Component>();
+	if (!m_parent)
+	{
+		if (_newState)
+			Link(s_root, this, m_prev);
+		else
+			Unlink(s_root, this, m_prev);
+	}
 
-		_component->AddRef();
-		_component->m_entity = this;
-		Link<Component>(m_components, _component, _component->m_prev);
+	if (_newState)
+		m_inScene = true;
+	_Register(_newState);
 
-		if (m_scene && m_scene->IsManaged())
-			_RegisterComponent(_component);
+	for (Component* i = m_components; i; i = i->m_nextComponent)
+		i->_Register(_newState);
 
-		return _component;
+	if(!_newState)
+		m_inScene = false;
+
+	for (Entity* i = m_child; i; i = i->m_next)
+		i->_AddToScene(_newState);
+}
+//----------------------------------------------------------------------------//
+void Entity::SetLayer(uint _layer, bool _recursive)
+{
+	m_layerMask = _layer;
+	for (Entity* i = m_child; i; i = i->m_next)
+		i->SetLayer(_layer, true);
+}
+//----------------------------------------------------------------------------//
+void Entity::AddLayer(uint _layer, bool _recursive)
+{
+	m_layerMask |= _layer;
+	for (Entity* i = m_child; i; i = i->m_next)
+		i->SetLayer(_layer, true);
+}
+//----------------------------------------------------------------------------//
+void Entity::RemoveLayer(uint _layer, bool _recursive)
+{
+	m_layerMask &= ~_layer;
+	for (Entity* i = m_child; i; i = i->m_next)
+		i->SetLayer(_layer, true);
+}
+//----------------------------------------------------------------------------//
+void Entity::SetParent(Entity* _parent, bool _keepWorldTransform)
+{
+	if (m_parent == _parent)
+		return;
+	for (Entity* i = _parent; i; i = i->m_parent)
+	{
+		if (i == this)
+			return;	// child entity cannot be parent
+	}
+
+
+	if (!m_parent && !m_inScene)
+		AddRef();
+
+	Matrix44 _worldTM;
+	if(_keepWorldTransform)
+		_worldTM = GetWorldTransform();
+
+	if (m_parent)
+		Unlink(m_parent->m_child, this, m_prev);
+	else if (m_inScene)
+		Unlink(s_root, this, m_prev);
+
+	_OnChangeParent(_parent);
+	m_parent = _parent;
+
+	if (m_parent)
+	{
+		Link(m_parent->m_child, this, m_prev);
+
+		if(m_parent->m_inScene != m_inScene)
+			_AddToScene(m_parent->m_inScene);
+	}
+	else if (m_inScene)
+	{
+		Link(s_root, this, m_prev);
+	}
+
+	if(_keepWorldTransform)
+		SetWorldTransform(_worldTM);
+
+	_OnParentEnable(m_parent ? m_parent->IsEnabled() : m_enabledSelf);
+
+	if (!m_parent && !m_inScene)
+		Release();
+}
+//----------------------------------------------------------------------------//
+Entity* Entity::GetParent(uint _type)
+{
+	for (Entity* i = m_parent; i; i = i->m_parent)
+	{
+		if (i->IsTypeOf(_type))
+			return i;
 	}
 	return nullptr;
 }
 //----------------------------------------------------------------------------//
-void Entity::_RegisterComponent(Component* _component)
+Entity* Entity::AddChild(uint _type)
 {
-	ASSERT(_component && _component->m_entity == this);
-
-	_component->_Register();
+	TypeInfo* _typeInfo = gReflection->GetTypeInfo(_type);
+	if (_typeInfo)
+	{
+		EntityPtr _child = _typeInfo->Factory().Cast<Entity>();
+		_child->SetParent(this, false);
+		return _child;
+	}
+	return nullptr;
 }
 //----------------------------------------------------------------------------//
-void Entity::_RegisterComponents(void)
+void Entity::_OnParentEnable(bool _enabled)
 {
-	for (Component* i = m_components; i; i = i->m_next)
-		_RegisterComponent(i);
+	if (m_parentEnabled != _enabled)
+	{
+		bool _current = IsEnabled();
+		_enabled = _enabled && m_enabledSelf;
+		m_parentEnabled = _enabled;
+		if (_enabled != _current)
+		{
+			for (Entity* i = m_child; i; i = i->m_next)
+				i->_OnParentEnable(_enabled);
+		}
+	}
 }
 //----------------------------------------------------------------------------//
-void Entity::_UnregisterComponent(Component* _component)
+void Entity::_EnableSelf(bool _enabled)
 {
-	ASSERT(_component && _component->m_entity == this);
-
-	_component->_Unregister();
-}
-//----------------------------------------------------------------------------//
-void Entity::_UnregisterComponents(void)
-{
-	for (Component* i = m_components; i; i = i->m_next)
-		_UnregisterComponent(i);
+	if (m_enabledSelf != _enabled)
+	{
+		bool _current = IsEnabled();
+		_enabled = _enabled && m_parentEnabled;
+		m_enabledSelf = _enabled;
+		if (_enabled != _current)
+		{
+			for (Entity* i = m_child; i; i = i->m_next)
+				i->_OnParentEnable(_enabled);
+		}
+	}
 }
 //----------------------------------------------------------------------------//
 const Matrix44& Entity::GetWorldTransform(void)
@@ -252,7 +307,7 @@ const Vector3& Entity::GetLocalScale(void)
 void Entity::SetWorldPosition(const Vector3& _position)
 {
 	m_localPosition = _position;
-	if (m_inheritPosition && m_parent)
+	if (m_inheritTransform && m_parent)
 		m_localPosition = m_parent->GetWorldTransform().Copy().Inverse().Transform(m_localPosition);
 	_InvalidateTransform();
 }
@@ -266,7 +321,7 @@ Vector3 Entity::GetWorldPosition(void)
 void Entity::SetWorldRotation(const Quaternion& _rotation)
 {
 	m_localRotation = _rotation;
-	if (m_inheritRotation && m_parent)
+	if (m_inheritTransform && m_parent)
 		m_localRotation = m_parent->GetWorldRotation().Copy().Inverse() * m_localRotation;
 	_InvalidateTransform();
 }
@@ -280,7 +335,7 @@ const Quaternion& Entity::GetWorldRotation(void)
 void Entity::SetWorldScale(const Vector3& _scale)
 {
 	m_localScale = _scale;
-	if (m_inheritScale && m_parent)
+	if (m_inheritTransform && m_parent)
 		m_localScale /= m_parent->GetWorldTransform().GetScale();
 	_InvalidateTransform();
 }
@@ -291,33 +346,13 @@ Vector3 Entity::GetWorldScale(void)
 	return m_worldTransform.GetScale();
 }
 //----------------------------------------------------------------------------//
-void Entity::SetInheritPosition(bool _enabled)
+void Entity::SetInheritTransform(bool _enabled)
 {
-	if (m_inheritPosition != _enabled)
+	if (m_inheritTransform != _enabled)
 	{
-		Vector3 _pos = GetWorldPosition();
-		m_inheritPosition = _enabled;
-		SetWorldPosition(_pos);
-	}
-}
-//----------------------------------------------------------------------------//
-void Entity::SetInheritRotation(bool _enabled)
-{
-	if (m_inheritRotation != _enabled)
-	{
-		Quaternion _rot = GetWorldRotation();
-		m_inheritRotation = _enabled;
-		SetWorldRotation(_rot);
-	}
-}
-//----------------------------------------------------------------------------//
-void Entity::SetInheritScale(bool _enabled)
-{
-	if (m_inheritScale != _enabled)
-	{
-		Vector3 _scl = GetWorldScale();
-		m_inheritScale = _enabled;
-		SetWorldScale(_scl);
+		Matrix44 _tm = GetWorldTransform();
+		m_inheritTransform = _enabled;
+		SetWorldTransform(_tm);
 	}
 }
 //----------------------------------------------------------------------------//
@@ -325,11 +360,20 @@ void Entity::_InvalidateTransform(void)
 {
 	if (m_transformUpdated)
 	{
-		//WakeUp();
 		m_transformUpdated = false;
-		m_transformChanged = true;
-		//_InvalidateWorldBBox();
-		for (Entity* i = m_child; i; i = i->m_next) // invalidate and activate all children
+
+		_OnTransformChanged();
+
+		if (m_inScene)
+		{
+			for (Component* i = m_components; i; i = i->m_nextComponent)
+			{
+				if(i->m_eventMask & Component::Transforms)
+					i->_OnTransformChanged();
+			}
+		}
+
+		for (Entity* i = m_child; i; i = i->m_next)
 			i->_InvalidateTransform();
 	}
 }
@@ -338,23 +382,87 @@ void Entity::_UpdateTransform(void)
 {
 	if (!m_transformUpdated)
 	{
-		Vector3 _pos = m_localPosition;
-		Quaternion _rot = m_localRotation;
-		Vector3 _scl = m_localScale;
+		_OnTransformUpdate();
 
-		if (m_parent)
-		{
-			if (m_inheritPosition)
-				_pos = m_parent->GetWorldTransform().Transform(_pos);
-			if (m_inheritRotation)
-				_rot = m_parent->GetWorldRotation() * _rot;
-			if (m_inheritScale)
-				_scl *= m_parent->GetWorldScale();
-		}
+		m_worldTransform.CreateTransform(m_localPosition, m_localRotation, m_localScale);
 
-		m_worldTransform.CreateTransform(_pos, _rot, _scl);
+		if (m_parent && m_inheritTransform)
+			m_worldTransform = m_parent->GetWorldTransform() * m_worldTransform;
+
 		m_worldRotation = m_worldTransform.GetRotation();
 		m_transformUpdated = true;
+		_OnTransformUpdated();
+	}
+}
+//----------------------------------------------------------------------------//
+Component* Entity::GetComponent(uint _type)
+{
+	for (Component* i = m_components; i; i = i->m_nextComponent)
+	{
+		if (i->IsTypeOf(_type))
+			return i;
+	}
+	return nullptr;
+}
+//----------------------------------------------------------------------------//
+Component* Entity::AddComponent(uint _type)
+{
+	TypeInfo* _typeInfo = gReflection->GetTypeInfo(_type);
+	if (_typeInfo)
+	{
+		if (_typeInfo->HasAnyOfFlags(Component::Single))
+		{
+			Component* _component = GetComponent(_type);
+			if (_component)
+				return _component;
+		}
+
+		ASSERT(_typeInfo->Factory != nullptr);
+		ComponentPtr _component = _typeInfo->Factory().Cast<Component>();
+		ASSERT(((Object*)_component)->IsTypeOf<Component>());
+
+		_component->AddRef();
+		_component->m_entity = this;
+		Link<Component>(m_components, _component, _component->m_prevComponent);
+
+		if (m_inScene)
+			_component->_Register(true);
+
+		return _component;
+	}
+	return nullptr;
+}
+//----------------------------------------------------------------------------//
+void Entity::RemoveComponent(Component* _component)
+{
+	if(_component && _component->m_entity == this)
+	{
+		if (m_inScene)
+			_component->_Register(false);
+
+		Unlink(m_components, _component, _component->m_prevComponent);
+		_component->m_entity = nullptr;
+		_component->Release();
+	}
+}
+//----------------------------------------------------------------------------//
+void Entity::_UpdateRecursive(void)
+{
+	for (Component* i = m_components; i;)
+	{
+		Component* _next = i->m_nextComponent;
+		if (i->m_eventMask & Component::Updates)
+			i->_Update();
+		i = _next;
+	}
+
+	_Update();
+
+	for (Entity* i = m_child; i;)
+	{
+		Entity* _next = i->m_next;
+		i->_UpdateRecursive();
+		i = _next;
 	}
 }
 //----------------------------------------------------------------------------//
@@ -364,74 +472,49 @@ void Entity::_UpdateTransform(void)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-Entity* Scene::AddEntity(void)
+Scene::Scene(void)
 {
-	EntityPtr _entity = new Entity;
-	_entity->_SetScene(this);
-	return _entity;
+	LOG_NODE("Create Scene manager");
+
+	gReflection->GetOrCreateTypeInfo<Entity>()->SetFactory([]() { return ObjectPtr(new Entity); });
 }
 //----------------------------------------------------------------------------//
-bool Scene::AddEntity(Entity* _entity)
+Scene::~Scene(void)
 {
-	if (!_entity)
-			return false;
-	if (_entity->m_parent)
+	LOG_NODE("Destroy Scene manager");
+}
+//----------------------------------------------------------------------------//
+EventResult Scene::_OnEvent(int _type, void* _data)
+{
+	switch (_type)
 	{
-		LOG("Unable to add non-root entity");
-		return false;
-	}
-	if (_entity->m_scene == this) // already attached
-		return true;
-
-	_entity->_SetScene(this);
-
-	return true;
-}
-//----------------------------------------------------------------------------//
-bool Scene::RemoveEntity(Entity* _entity)
-{
-	if (!_entity || _entity->m_scene != this)
-		return false;
-
-	_entity->SetParent(nullptr);
-	_entity->_SetScene(nullptr);
-
-	return true;
-}
-//----------------------------------------------------------------------------//
-void Scene::Enable(bool _enable)
-{
-
-}
-//----------------------------------------------------------------------------//
-void Scene::_AddRootEntity(Entity* _entity)
-{
-	Link(m_rootEntities, _entity, _entity->m_prev);
-}
-//----------------------------------------------------------------------------//
-void Scene::_RemoveRootEntity(Entity* _entity)
-{
-	Unlink(m_rootEntities, _entity, _entity->m_prev);
-}
-//----------------------------------------------------------------------------//
-void Scene::_Register(void)
-{
-	ASSERT(m_inSystem == false);
-
-	m_inSystem = true;
-	for (Entity* i = m_rootEntities; i; i = i->m_next)
+	case SystemEvent::PreUpdate:
 	{
-		i->_RegisterComponents();
 	}
-}
-//----------------------------------------------------------------------------//
-void Scene::_Unregister(void)
-{
-	for (Entity* i = m_rootEntities; i; i = i->m_next)
+	break;
+
+	case SystemEvent::Update:
 	{
-		i->_UnregisterComponents();
+		for (Entity* _entity = Entity::s_root; _entity;)
+		{
+			Entity* _next = _entity->m_next;
+			_entity->_UpdateRecursive();
+			_entity = _next;
+		}
+
+	} break;
+
+	case SystemEvent::Stop: // temp
+	{
+		while (Entity::s_root)
+		{
+			Entity::s_root->Destroy();
+		}
+
+	} break;
 	}
-	m_inSystem = false;
+
+	return ER_Pass;
 }
 //----------------------------------------------------------------------------//
 
@@ -445,59 +528,12 @@ SceneSystem* SceneSystem::s_lastSceneSystem = nullptr;
 //----------------------------------------------------------------------------//
 SceneSystem::SceneSystem(void)
 {
-	Link(s_firstSceneSystem, s_lastSceneSystem, this, m_prevSceneSystem);
+	LinkLast(s_firstSceneSystem, s_lastSceneSystem, this, m_prevSceneSystem);
 }
 //----------------------------------------------------------------------------//
 SceneSystem::~SceneSystem(void)
 {
 	Unlink(s_firstSceneSystem, s_lastSceneSystem, this, m_prevSceneSystem);
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// SceneManager
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-SceneManager::SceneManager(void)
-{
-	LOG_NODE("Create SceneManager");
-}
-//----------------------------------------------------------------------------//
-SceneManager::~SceneManager(void)
-{
-	LOG_NODE("Destroy SceneManager");
-}
-//----------------------------------------------------------------------------//
-void SceneManager::AddScene(Scene* _scene)
-{
-	if (!_scene || _scene->m_inSystem)
-		return;
-
-	_scene->AddRef();
-	Link(m_scenes, _scene, _scene->m_prev);
-	_scene->_Register();
-}
-//----------------------------------------------------------------------------//
-EventResult SceneManager::_OnEvent(int _type, void* _data)
-{
-	switch (_type)
-	{
-	case ET_BeginFrame:
-	{
-
-	} break;
-
-	case ET_EndFrame:
-	{
-		/*gEntitySystem->_RegisterComponents();
-		gEntitySystem->_UnregisterComponents();
-		gEntitySystem->_DestroyEntities();*/
-
-	} break;
-	}
-
-	return ER_Pass;
 }
 //----------------------------------------------------------------------------//
 

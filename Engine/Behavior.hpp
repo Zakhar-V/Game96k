@@ -11,26 +11,20 @@
 // Behavior 
 //----------------------------------------------------------------------------//
 
-class Behavior : public Component
+class Behavior abstract: public Component
 {
 public:
-	RTTI("Behavior");
+	RTTI("Behavior"); //!>\note it's abstract base class: typeinfo is not registered 
 
+	Behavior(void);
+	~Behavior(void);
 
 protected:
-	friend class BehaviorSystem;
+	void _Register(bool _newState) override;
 
-	void _Register(void) override;	void _Unregister(void) override;
-
-	virtual void _Start(void)
-	{ 
-		LOG("start");
-	}
+	virtual void _Start(void) { }
 	virtual void _Update(void) { }
-	virtual void _OnDestroy(void) { }
-
-	Behavior* m_prevBehavior = nullptr;
-	Behavior* m_nextBehavior = nullptr;
+	virtual void _Stop(void) { }
 };
 
 //----------------------------------------------------------------------------//
@@ -44,13 +38,8 @@ public:
 	~BehaviorSystem(void);
 
 protected:
-	friend class Behavior;
 
-	void _Register(Behavior* _behavior);
-	void _Unregister(Behavior* _behavior);
-
-	Behavior* m_activeBehaviors = nullptr;
-	Behavior* m_inactiveBehaviors = nullptr;
+	EventResult _OnEvent(int _type, void* _data) override;
 };
 
 //----------------------------------------------------------------------------//

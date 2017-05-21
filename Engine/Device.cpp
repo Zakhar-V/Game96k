@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Device.hpp"
-#include "OpenGL.hpp"
 
 //----------------------------------------------------------------------------//
 // Device
@@ -32,18 +31,11 @@ Device::Device(void)
 		// size
 		RECT _rect;
 		GetClientRect(m_window, &_rect);
-		m_width = _rect.right - _rect.left;
-		m_height = _rect.bottom - _rect.top;
-	}
-
-	// init timer
-	{
-		LARGE_INTEGER _f;
-		QueryPerformanceFrequency(&_f);
-		m_timerFreq = 1.0 / (double)_f.QuadPart;
+		m_size.Set((float)(_rect.right - _rect.left), (float)(_rect.bottom - _rect.top));
 	}
 
 	m_opened = true;
+	m_active = true;
 }
 //----------------------------------------------------------------------------//
 Device::~Device(void)
@@ -54,44 +46,20 @@ Device::~Device(void)
 	DeleteAtom(m_atom);
 }
 //----------------------------------------------------------------------------//
-double Device::CurrentTime(void)
-{
-	LARGE_INTEGER _c;
-	QueryPerformanceCounter(&_c);
-	return m_timerFreq * (double)_c.QuadPart;
-}
-//----------------------------------------------------------------------------//
 EventResult Device::_OnEvent(int _type, void* _data)
 {
 	switch (_type)
 	{
-	case ET_BeginFrame:
+	case SystemEvent::BeginFrame:
 	{
-		m_beginFrame = CurrentTime();
 		for (MSG _msg; PeekMessageA(&_msg, 0, 0, 0, PM_REMOVE);)
 		{
 			TranslateMessage(&_msg);
 			DispatchMessageA(&_msg);
 		}
-		m_endMessages = CurrentTime();
 
-	} break;
-
-	case ET_EndFrame:
-	{
-		m_endFrame = CurrentTime();
-
-		double _dt = m_endMessages - m_beginFrame;
-		if (_dt > 0.1)
-			m_frameTime = (float)(m_endFrame - m_endMessages);
-		else
-			m_frameTime = (float)(m_endFrame - m_beginFrame);
-
-		// temp
-		/*char _buff[64];
-		FloatToString(_buff, m_frameTime);
-		SetWindowTextA(m_window, _buff);
-		LOG("%f", m_frameTime);*/
+		if (m_cursorMode == CursorMode::Camera && m_active)
+			_CursorToCenter();
 
 	} break;
 	}
@@ -103,18 +71,64 @@ LRESULT Device::_HandleMsg(UINT _msg, WPARAM _wParam, LPARAM _lParam)
 {
 	switch (_msg)
 	{
+	case WM_SETFOCUS:
+		m_active = true;
+
+		m_resetCameraDelta = true;
+
+		if (m_cursorMode != CursorMode::Default)
+			ShowCursor(false);
+		break;
+
+	case WM_KILLFOCUS:
+		m_active = false;
+		m_resetCameraDelta = true;
+
+		ClipCursor(nullptr);
+		if (m_cursorMode != CursorMode::Default)
+			ShowCursor(true);
+		break;
+
 	case WM_CLOSE:
 		m_opened = false;
 		return 0;
 
 	case WM_SIZE:
+	{
 		if (_wParam == SIZE_MAXIMIZED || _wParam == SIZE_RESTORED)
 		{
-			m_width = LOWORD(_lParam);
-			m_height = HIWORD(_lParam);
-			//SendEvent(resize, &m_width)
+			m_size.Set(LOWORD(_lParam), HIWORD(_lParam));
 		}
-		break;
+		m_resetCameraDelta = true;
+
+		Vector2 _size = m_size;
+		SendEvent(DeviceEvent::Resize, &_size);
+	}
+	break;
+
+	case WM_MOUSEMOVE:
+	{
+		if ((m_cursorMode == CursorMode::Camera || m_fullscreen) && m_active)
+		{
+			RECT _rc, _crc;
+			POINT _pt;
+			GetClientRect(m_window, &_rc);
+			_pt.x = _rc.left;
+			_pt.y = _rc.top;
+			ClientToScreen(m_window, &_pt);
+			_crc.left = _pt.x;
+			_crc.top = _pt.y;
+			_crc.right = _pt.x + _rc.right;
+			_crc.bottom = _pt.y + _rc.bottom;
+			ClipCursor(&_crc);
+		}
+		else
+			ClipCursor(nullptr);
+
+		//m_cursorPrevPos = m_cursorPos;
+		m_cursorPos.Set(LOWORD(_lParam), HIWORD(_lParam));
+	}
+	break;
 	}
 
 	return DefWindowProcA(m_window, _msg, _wParam, _lParam);
@@ -126,6 +140,39 @@ LRESULT __stdcall Device::_WindowCallback(HWND _wnd, UINT _msg, WPARAM _wParam, 
 		return gDevice->_HandleMsg(_msg, _wParam, _lParam);
 
 	return DefWindowProcA(_wnd, _msg, _wParam, _lParam);
+}
+//----------------------------------------------------------------------------//
+void Device::SetCursorMode(CursorMode _mode)
+{
+	if (m_cursorMode != _mode)
+	{
+		if (m_cursorMode == CursorMode::Default)
+			ShowCursor(false);
+		else //if(m_active)
+			ShowCursor(true);
+
+		m_cursorMode = _mode;
+
+		if (_mode == CursorMode::Camera)
+		{
+			m_resetCameraDelta = true;
+			_CursorToCenter();
+		}
+		else
+			m_cameraDelta = Vector2::Zero;
+	}
+}
+//----------------------------------------------------------------------------//
+void Device::_CursorToCenter(void)
+{
+	IntVector2 _center = m_size * .5f;
+	m_cameraDelta = m_resetCameraDelta ? 0 : (m_cursorPos - _center);
+	m_resetCameraDelta = false;
+	POINT _pt;
+	_pt.x = _center.x;
+	_pt.y = _center.y;
+	ClientToScreen(m_window, &_pt);
+	SetCursorPos(_pt.x, _pt.y);
 }
 //----------------------------------------------------------------------------//
 

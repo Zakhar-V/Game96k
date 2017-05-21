@@ -6,27 +6,28 @@
 // Event
 //----------------------------------------------------------------------------//
 
-enum EventType : uint8
+// system: 0-100
+// device: 101-200
+// renderer: 201 - 300
+struct SystemEvent
 {
-	ET_PreStart,
-	ET_Start,
-	ET_PostStart,
+	enum Enum
+	{
+		PreStart,
+		Start,
+		PostStart,
 
-	ET_PreStop,
-	ET_Stop,
-	ET_PostStop,
+		PreStop,
+		Stop,
+		PostStop,
 
-	ET_BeginFrame,
-	ET_PreUpdate,
-	ET_Update,
-	ET_PostUpdate,
-	ET_PreRender,
-	ET_RenderScene,
-	ET_PostRenderScene,
-	//ET_DebugDraw,
-	ET_RenderOverlay,
-	ET_PostRender,
-	ET_EndFrame,
+		BeginFrame,
+		PreUpdate,
+		Update,
+		PostUpdate,
+		Render,
+		EndFrame,
+	};
 };
 
 enum EventResult
@@ -47,6 +48,8 @@ public:
 	~System(void);
 
 	static EventResult SendEvent(int _type, void* _data = nullptr);
+	template <class T> static EventResult SendEvent(int _type, T _data) { return SendEvent(_type, reinterpret_cast<void*>(&_data)); }
+	template <class T> static EventResult SendEvent(int _type, T* _data) { return SendEvent(_type, reinterpret_cast<void*>(_data)); }
 
 protected:
 	virtual EventResult _OnEvent(int _type, void* _data) { return ER_Pass; }

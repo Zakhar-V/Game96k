@@ -17,8 +17,8 @@ Application::~Application(void)
 //----------------------------------------------------------------------------//
 void Application::Run(void)
 {
-	LOG("Start app ...");
-	for (int i = ET_PreStart; i <= ET_PostStart; ++i)
+	LOG("Start main loop ...");
+	for (int i = SystemEvent::PreStart; i <= SystemEvent::PostStart; ++i)
 	{
 		if (_SendEvent(i) != ER_Pass)
 		{
@@ -30,7 +30,8 @@ void Application::Run(void)
 	LOG("Main loop ...");
 	while (!m_quit)
 	{
-		for (int i = ET_BeginFrame; i <= ET_EndFrame; ++i)
+		//LOG("--------------------------------------------------------------------------");
+		for (int i = SystemEvent::BeginFrame; i <= SystemEvent::EndFrame; ++i)
 		{
 			EventResult _r = _SendEvent(i);
 			if (_r == ER_Break)
@@ -43,8 +44,8 @@ void Application::Run(void)
 		}
 	}
 
-	LOG("Stop app ...");
-	for (int i = ET_PreStop; i <= ET_PostStop; ++i)
+	LOG("Stop main app ...");
+	for (int i = SystemEvent::PreStop; i <= SystemEvent::PostStop; ++i)
 	{
 		if (_SendEvent(i) != ER_Pass)
 		{

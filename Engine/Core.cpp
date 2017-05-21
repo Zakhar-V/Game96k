@@ -2,7 +2,30 @@
 
 #include "Core.hpp"
 #include "Math.hpp"
+#include "Thread.hpp"
 #include <Windows.h>
+
+//----------------------------------------------------------------------------//
+// LOG file
+//----------------------------------------------------------------------------//
+
+#if defined(_LOG) || defined(_FATAL)
+HANDLE g_log = nullptr;
+void _WriteLog(const char* _msg, int _length = -1)
+{
+	if (!g_log)
+	{
+		//g_log = CreateFile(String(APP_NAME) + ".log", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	}
+	if (g_log)
+	{
+		_length = String::Length(_msg, _length);
+		DWORD _written = 0;
+		//WriteFile(g_log, _msg, _length, &_written, nullptr);
+		//FlushFileBuffers(g_log);
+	}
+}
+#endif
 
 //----------------------------------------------------------------------------//
 // Fatal
@@ -11,8 +34,14 @@
 #ifdef _FATAL
 void Fatal(const char* _msg)
 {
+	_WriteLog("FATAL ERROR:\n");
+	_WriteLog(_msg);
+
 #ifdef _DEBUG
-	LOG("Fatal error: %s", _msg);
+	printf("FATAL ERROR:\n");
+	printf(_msg);
+	printf("\n");
+
 	if(IsDebuggerPresent())
 		DebugBreak();
 	else
@@ -29,15 +58,23 @@ void Fatal(const char* _msg)
 //----------------------------------------------------------------------------//
 
 #ifdef _LOG
+SpinLock g_logMutex;
 void LogMessage(const char* _msg, ...)
 {
-	for(int i = 0; i < LogNode::s_depth; ++i)
-		printf("\t"); 
+	SCOPE_LOCK(g_logMutex);
+
+	String _str;
+	for (int i = 0; i < LogNode::s_depth; ++i)
+		_str.Append('\t');
 	va_list _args;
 	va_start(_args, _msg);
-	vprintf(_msg, _args);
+	_str += String::FormatV(_msg, _args) + "\n";
 	va_end(_args);
-	printf("\n");
+
+#ifdef _DEBUG
+	printf("%s", *_str);
+#endif
+	_WriteLog(_str, _str.Length());
 }
 #endif
 
@@ -73,7 +110,7 @@ LogNode::~LogNode(void)
 extern "C" const int _fltused = 1;
 
 //----------------------------------------------------------------------------//
-extern "C" __declspec(naked) void __cdecl _chkstk()
+/*extern "C" __declspec(naked) void __cdecl _chkstk()
 {
 	// code from chkstk.asm
 #define _PAGESIZE_ 4096
@@ -110,9 +147,9 @@ cs20:
 	__asm sub eax, _PAGESIZE_; // decrease by PAGESIZE
 	__asm test dword ptr[eax], eax; // probe page.
 	__asm jmp short cs10
-}
+} */
 //----------------------------------------------------------------------------//
-extern "C" int __cdecl _ftol2(float _val)
+/*extern "C" int __cdecl _ftol2(float _val)
 {
 	int _r;
 	__asm fistp _r
@@ -124,7 +161,7 @@ extern "C" int __cdecl _ftol2_sse(float _val)
 	int _r;
 	__asm fistp _r
 	return _r;
-}
+}*/
 //----------------------------------------------------------------------------//
 #pragma function(memset)
 #pragma optimize("", off)
@@ -146,63 +183,60 @@ void* memcpy(void* _dst, const void* _src, size_t _size)
 }
 #pragma optimize("", on)
 //----------------------------------------------------------------------------//
-void*  operator new (size_t _size)
-{
-	return MemoryAlloc(_size);
-}
-//----------------------------------------------------------------------------//
-void*  operator new [](size_t _size)
-{
-	return MemoryAlloc(_size);
-}
-//----------------------------------------------------------------------------//
-void  operator delete (void* _p)
-{
-	MemoryFree(_p);
-}
-//----------------------------------------------------------------------------//
-void  operator delete [](void* _p)
-{
-	MemoryFree(_p);
-}
-//----------------------------------------------------------------------------//
-void  operator delete (void* _p, size_t _size)
-{
-	MemoryFree(_p);
-}
-//----------------------------------------------------------------------------//
-void operator delete [](void* _p, size_t _size)
-{
-	MemoryFree(_p);
-}
-//----------------------------------------------------------------------------//
-
-#endif
-
-//----------------------------------------------------------------------------//
-// Memory
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-void* MemorySet(void* _dst, int _val, size_t _size)
-{
-	return memset(_dst, _val, _size);
-}
-//----------------------------------------------------------------------------//
-void* MemoryCopy(void* _dst, const void* _src, size_t _size)
-{
-	return memcpy(_dst, _src, _size);
-}
-//----------------------------------------------------------------------------//
-void* MemoryAlloc(size_t _size)
+#ifndef _EDITOR
+#pragma warning(push, 1)
+//#pragma warning(disable: 4273) // Inconsistent DLL linkage
+extern "C" void* __cdecl malloc(size_t _size)
 {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, _size);
 }
 //----------------------------------------------------------------------------//
-void MemoryFree(void* _p)
+extern "C" void __cdecl free(void* _p)
 {
 	HeapFree(GetProcessHeap(), 0, _p);
 }
+#pragma warning(pop)
+#endif
+//----------------------------------------------------------------------------//
+void*  operator new (size_t _size)
+{
+	return malloc(_size);
+}
+//----------------------------------------------------------------------------//
+void*  operator new [](size_t _size)
+{
+	return malloc(_size);
+}
+//----------------------------------------------------------------------------//
+void  operator delete (void* _p)
+{
+	if (_p)
+		free(_p);
+}
+//----------------------------------------------------------------------------//
+void  operator delete [](void* _p)
+{
+	if (_p)
+		free(_p);
+}
+//----------------------------------------------------------------------------//
+void  operator delete (void* _p, size_t _size)
+{
+	if (_p)
+		free(_p);
+}
+//----------------------------------------------------------------------------//
+void operator delete [](void* _p, size_t _size)
+{
+	if (_p)
+		free(_p);
+}
+//----------------------------------------------------------------------------//
+
+#endif // _DEBUG
+
+//----------------------------------------------------------------------------//
+//
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
@@ -241,7 +275,7 @@ String& String::Reserve(uint _maxLength)
 	{
 		_maxLength = GrowTo(m_capacity, _maxLength) | 15;
 		char* _newData = Allocate<char>(_maxLength + 1);
-		MemoryCopy(_newData, m_data, m_length);
+		memcpy(_newData, m_data, m_length);
 		_newData[m_length] = 0;
 		Deallocate(m_data);
 		m_data = _newData;
@@ -270,7 +304,7 @@ String& String::Append(const char* _str, int _length)
 	{
 		uint _newLength = m_length + _length;
 		Reserve(_newLength);
-		MemoryCopy(m_data + m_length, _str, _length);
+		memcpy(m_data + m_length, _str, _length);
 		m_length = _newLength;
 		m_data[m_length] = 0;
 	}
@@ -386,6 +420,31 @@ String String::PrintSize(uint _size, float _div, const char* _prefix, const char
 	return FromFloat(_size / _div / _div / _div, 2).Append(_prefix).Append("G").Append(_suffix);
 }
 //----------------------------------------------------------------------------//
+String String::Format(const char* _fmt, ...)
+{
+	va_list _args;
+	va_start(_args, _fmt);
+	String _str = FormatV(_fmt, _args);
+	va_end(_args);
+	return _str;
+}
+//----------------------------------------------------------------------------//
+int(_cdecl*_vsnprintf_pfn)(char* _dst, size_t _size, const char* _fmt, va_list _args) = nullptr;
+
+String String::FormatV(const char* _fmt, va_list _args)
+{
+	if (!_vsnprintf_pfn)
+	{
+		HMODULE _h = LoadLibraryA("msvcrt.dll");
+		_vsnprintf_pfn = reinterpret_cast<decltype(_vsnprintf_pfn)>(GetProcAddress(_h, "_vsnprintf"));
+		CHECK(_vsnprintf_pfn != nullptr, "_vsnprintf not found");
+		//_vsnprintf_pfn = &__vsnprintf;
+	} 
+	char _buff[4096];
+	int _r = _vsnprintf_pfn(_buff, sizeof(_buff), _fmt, _args);
+	return _buff;
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // Allocator utilities
@@ -454,14 +513,36 @@ void _LL_Unlink(void* _head, void* _this, void* _node)
 	*_next = nullptr;
 }
 //----------------------------------------------------------------------------//
-void _LL_Link(void* _first, void* _last, void* _this, void* _node)
+void _LL_LinkFirst(void* _first, void* _last, void* _this, void* _node)
+{
+	/*
+	next = first;
+	if(next) next->prev = this;
+	first = this;
+	if(!last) last = this;
+
+	*/
+
+	size_t _offset = (uint8*)_node - (uint8*)_this;
+	void** _prev = 0 + (void**)_node;
+	void** _next = 1 + (void**)_node;
+
+	*_next = *(void**)_first;
+	if (*_next)
+		_LL_Field(*_next, _offset)[0] = _this;
+	*(void**)_first = _this;
+	if (!*(void**)_last)
+		*(void**)_last = _this;
+}
+//----------------------------------------------------------------------------//
+void _LL_LinkLast(void* _first, void* _last, void* _this, void* _node)
 {
 	/*
 	prev = last;
 	if(prev) prev->next = this;
 	last = this;
-	if(!_first) first = this;
-		
+	if(!first) first = this;
+
 	*/
 
 	size_t _offset = (uint8*)_node - (uint8*)_this;
@@ -472,7 +553,7 @@ void _LL_Link(void* _first, void* _last, void* _this, void* _node)
 	if (*_prev)
 		_LL_Field(*_prev, _offset)[1] = _this;
 	*(void**)_last = _this;
-	if(!*(void**)_first)
+	if (!*(void**)_first)
 		*(void**)_first = _this;
 }
 //----------------------------------------------------------------------------//
@@ -558,7 +639,7 @@ Reflection::TypeInfo* Reflection::GetOrCreateTypeInfo(uint _type)
 	if (_iter != m_types.End())
 		return &_iter->second;
 
-	LOG("Register %s typeinfo", _name);
+	LOG("Register %s(0x%04x) typeinfo", _name, _type);
 
 	auto& _typeInfo = m_types[_type];
 	_typeInfo.type = _type;

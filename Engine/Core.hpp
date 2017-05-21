@@ -18,9 +18,23 @@
 // Preprocessor unitlities
 //----------------------------------------------------------------------------//
 
+#define _EMPTY()
 #define _QUOTE( x ) #x
 #define _QUOTE_IN_PLACE( x ) _QUOTE( x )
 #define __FILELINE__ __FILE__"(" _QUOTE_IN_PLACE( __LINE__ ) ")"
+#define DEPRECATED __declspec(deprecated)
+#define _PRAGMA(x) __pragma(x)
+#define _PRAGMA_MESSAGE(x) _PRAGMA(message(__FILELINE__ " : " x))
+#define COMPILER_MESSAGE(_prefix, _message) _PRAGMA_MESSAGE(_prefix ": " _message )
+#define COMPILER_MESSAGE_EX(_prefix, _source, _message) COMPILER_MESSAGE(_prefix, _source " : " _message)
+#define WARNING_EX(_source, _message) COMPILER_MESSAGE_EX("Warning", _source, _message)
+#define WARNING(_message) WARNING_EX(__FUNCTION__, _message)
+#define FIXME_EX(_source, _message) COMPILER_MESSAGE_EX("FixMe", _source, _message)
+#define FIXME(_message) FIXME_EX(__FUNCTION__, _message)
+#define TODO_EX(_source, _message) COMPILER_MESSAGE_EX("ToDo", _source, _message)
+#define TODO(_message) TODO_EX(__FUNCTION__, _message)
+#define NOT_IMPLEMENTED_YET() FIXME("Not implemented yet")
+#define NOT_IMPLEMENTED_YET_EX(_source) FIXME_EX(_source, "Not implemented yet")
 
 //----------------------------------------------------------------------------//
 // Settings
@@ -43,10 +57,10 @@
 #else // release settings
 
 #	define _FATAL // enable fatal errors handling
-//#	define _LOG // enable logging
+#	define _LOG // enable logging
 //#	define _DEBUG_RC // debug refcounting
-//#	define _DEBUG_GRAPHICS // enable OpenGL debug layer
-//#	define _STATISTICS // enable statistics
+#	define _DEBUG_GRAPHICS // enable OpenGL debug layer
+#	define _STATISTICS // enable statistics
 
 #endif
 
@@ -86,9 +100,11 @@ struct LogNode
 };
 #	define LOG(msg, ...) LogMessage(msg, ##__VA_ARGS__)
 #	define LOG_NODE(name) LogNode _logNode_(name)
+#	define LOG_NODE_F(name, ...) LogNode _logNode_(String::Format(name, ##__VA_ARGS__))
 #else
 #	define LOG(msg, ...)
 #	define LOG_NODE(name) 
+#	define LOG_NODE_F(name, ...)
 #endif
 
 //----------------------------------------------------------------------------//
@@ -106,7 +122,7 @@ struct LogNode
 //----------------------------------------------------------------------------//
 
 #ifdef _DEBUG
-#	define DEBUG_CODE(...) ;##__VA_ARGS__
+#	define DEBUG_CODE(...) _EMPTY() ##__VA_ARGS__
 #else
 #	define DEBUG_CODE(...)
 #endif
@@ -129,10 +145,25 @@ typedef unsigned int uint;
 // Memory
 //----------------------------------------------------------------------------//
 
-void* MemorySet(void* _dst, int _val, size_t _size);
+/*void* MemorySet(void* _dst, int _val, size_t _size);
 void* MemoryCopy(void* _dst, const void* _src, size_t _size);
 void* MemoryAlloc(size_t _size);
-void MemoryFree(void* _p);
+void MemoryFree(void* _p);*/
+
+//----------------------------------------------------------------------------//
+// NonCopyable
+//----------------------------------------------------------------------------//
+
+class NonCopyable
+{
+public:
+	NonCopyable(void) { }
+	~NonCopyable(void) { }
+
+private:
+	NonCopyable(const NonCopyable&) = delete;
+	NonCopyable& operator = (const NonCopyable&) = delete;
+};
 
 //----------------------------------------------------------------------------//
 // Move semantics
@@ -166,6 +197,8 @@ template <class T> void Destroy(T* _dst) { _dst->~T(); }
 template <class T> void ConstructRange(T* _dst, const T* _end, const T* _src) { while (_dst < _end) Construct(_dst++, *_src++); }
 //!
 template <class T> void ConstructRange(T* _dst, const T* _end, const T& _src) { while (_dst < _end) Construct(_dst++, _src); }
+//!
+template <class T> void MoveRange(T* _dst, const T* _end, T* _src) { while (_dst < _end) Construct(_dst++, Move(*_src++)); }
 
 //!
 template <class T> void DestroyRange(T* _dst, const T* _end) { while (_dst < _end) Destroy(_dst++); }
@@ -336,6 +369,15 @@ public:
 	Array& Push(const T* _start, const T* _end) { return Push(_start, (uint)(_end - _start)); }
 	//!
 	Array& Push(InitializerList<T> _list) { return Push(_list.begin(), _list.end()); }
+	//!
+	Array& Push(T&& _e) 
+	{ 
+		uint _newUsed = m_size + 1;
+		_Realloc(_newUsed);
+		Construct(m_data + m_size, Forward<T>(_e));
+		m_size = _newUsed;
+		return *this;
+	}
 
 	//!
 	Array& Pop(uint _count = 1)
@@ -381,7 +423,7 @@ protected:
 			_newSize = GrowTo(m_capacity, _newSize); // quantize memory
 			T* _newData = Allocate<T>(_newSize);
 
-			ConstructRange(_newData, _newData + m_size, m_data);
+			MoveRange(_newData, _newData + m_size, m_data);
 			DestroyRange(m_data, m_data + m_size);
 
 			Deallocate(m_data);
@@ -405,17 +447,63 @@ template <class T> auto end(Array<T>& _array)->decltype(_array.End()) { return _
 template <class T> auto end(const Array<T>& _array)->decltype(_array.End()) { return _array.End(); }
 
 //----------------------------------------------------------------------------//
+// Sort 
+//----------------------------------------------------------------------------//
+
+template <class T, class C> void _Sort(T* _data, int _first, int _last, C _cmp)
+{
+	int i = _first;	// lhs
+	int j = _last;	// rhs
+	T x = _data[(_first + _last) >> 1];	// pivot
+
+	if (_cmp(_data[i], x) && _cmp(_data[j], _data[i]))
+		x = _data[i];
+	else if (_cmp(_data[j], x) && _cmp(_data[i], _data[j]))
+		x = _data[j];
+
+	do
+	{
+		while (_cmp(_data[i], x))
+			i++;
+		while (_cmp(x, _data[j]))
+			j--;
+
+		if (i <= j)
+		{
+			if (_cmp(_data[j], _data[i]))
+				Swap(_data[i], _data[j]);
+			i++;
+			j--;
+		}
+
+	} while (i <= j);
+
+	if (i < _last)
+		_Sort(_data, i, _last, _cmp);
+	if (_first < j)
+		_Sort(_data, _first, j, _cmp);
+}
+
+template <class T, class C> void Sort(T _start, T _end, C _cmp)
+{
+	if (_start < _end)
+		_Sort(_start, 0, uint(_end - _start) - 1, _cmp);
+}
+
+//----------------------------------------------------------------------------//
 // List 
 //----------------------------------------------------------------------------//
 
 void _LL_Link(void* _head, void* _this, void* _node);
 void _LL_Unlink(void* _head, void* _this, void* _node);
-void _LL_Link(void* _first, void* _last, void* _this, void* _node);
+void _LL_LinkFirst(void* _first, void* _last, void* _this, void* _node);
+void _LL_LinkLast(void* _first, void* _last, void* _this, void* _node);
 void _LL_Unlink(void* _first, void* _last, void* _this, void* _node);
 
 template <class T> void Link(T*& _head, T* _this, T*& _node) { _LL_Link(&_head, _this, &_node); }
 template <class T> void Unlink(T*& _head, T* _this, T*& _node) { _LL_Unlink(&_head, _this, &_node); }
-template <class T> void Link(T*& _first, T*& _last, T* _this, T*& _node) { _LL_Link(&_first, &_last, _this, &_node); }
+template <class T> void LinkFirst(T*& _first, T*& _last, T* _this, T*& _node) { _LL_LinkFirst(&_first, &_last, _this, &_node); }
+template <class T> void LinkLast(T*& _first, T*& _last, T* _this, T*& _node) { _LL_LinkLast(&_first, &_last, _this, &_node); }
 template <class T> void Unlink(T*& _first, T*& _last, T* _this, T*& _node) { _LL_Unlink(&_first, &_last, _this, &_node); }
 
 //----------------------------------------------------------------------------//
@@ -461,6 +549,93 @@ public:
 protected:
 
 	T* m_ptr;
+};
+
+//----------------------------------------------------------------------------//
+// PageAllocator
+//----------------------------------------------------------------------------//
+
+template <class T, uint S = 4096 / sizeof(T)> class PageAllocator : public NonCopyable
+{
+	struct Block
+	{
+		Block* next;
+	};
+
+	struct Page
+	{
+		Page* prev = nullptr;
+		Page* next = nullptr;
+		uint8* Data(void) { return reinterpret_cast<uint8*>(this) + sizeof(*this); }
+		Block* At(uint _idx) { return reinterpret_cast<Block*>(Data() + _idx * sizeof(T)); }
+	};
+
+public:
+	enum : uint { Size = S }; // num elements
+
+	PageAllocator(void) = default;
+	~PageAllocator(void) { FreeMemory(); }
+
+	void FreeMemory(void)
+	{
+		while (m_root)
+		{
+			Page* _page = m_root;
+			Unlink(m_root, _page, _page->prev);
+			Deallocate(_page);
+		}
+	}
+
+	T* Alloc(void)
+	{
+		if (!m_free)
+			_AddPage();
+
+		Block* _block = m_free;
+		m_free = m_free->next;
+		return reinterpret_cast<T*>(_block);
+	}
+	void Free(T* _e)
+	{
+		if (_e)
+		{
+			Block* _block = reinterpret_cast<Block*>(_e);
+			_block->next = m_free;
+			m_free = _block;
+		}
+	}
+
+	template <class... A> T* New(A&&... _args)
+	{
+		T* _new = Alloc();
+		Construct(_new, Forward<A>(_args)...);
+		return _new;
+	}
+	void Delete(T* _e)
+	{
+		if (_e)
+		{
+			Destroy(_e);
+			Free(_e);
+		}
+	}
+
+protected:
+	void _AddPage(void)
+	{
+		Page* _page = AllocateBlock<Page>(sizeof(Page) + Size * sizeof(T));
+		_page->prev = nullptr;
+		_page->next = nullptr;
+		for (uint i = 0; i < Size; ++i)
+			_page->At(i)->next = _page->At(i + 1);
+		_page->At(Size - 1)->next = m_free;
+		m_free = _page->At(0);
+
+		Link(m_root, _page, _page->prev);
+	}
+
+	Page* m_root = nullptr;
+	Block* m_free = nullptr;
 };
 
 //----------------------------------------------------------------------------//
@@ -1071,6 +1246,8 @@ public:
 	//!
 	String& Append(const char* _str, int _length = -1);
 	//!
+	String& Append(const char* _s, const char* _e) { ASSERT(_s <= _e); return Append(_s, (uint)(_e - _s)); }
+	//!
 	String& Append(char _ch) { return Append(&_ch, 1); }
 
 	//!
@@ -1104,6 +1281,10 @@ public:
 	static String FromFloat(float _val, uint _digits = 6) { char _buff[64]; FromFloat(_buff, _val, _digits); return _buff; }
 	//!
 	static String PrintSize(uint _size, float _div, const char* _prefix, const char* _suffix);
+	//!
+	static String Format(const char* _fmt, ...);
+	//!
+	static String FormatV(const char* _fmt, va_list _args);
 
 protected:
 	uint m_length = 0;
@@ -1115,13 +1296,13 @@ protected:
 template <class T> inline uint MakeHash(const String& _value) { return _value.Hash(); }
 
 //!
-template <class T> auto begin(String& _string)->decltype(_string.Begin()) { return _string.Begin(); }
+inline auto begin(String& _string)->decltype(_string.Begin()) { return _string.Begin(); }
 //!
-template <class T> auto begin(const String& _string)->decltype(_string.Begin()) { return _string.Begin(); }
+inline auto begin(const String& _string)->decltype(_string.Begin()) { return _string.Begin(); }
 //!
-template <class T> auto end(String& _string)->decltype(_string.End()) { return _string.End(); }
+inline auto end(String& _string)->decltype(_string.End()) { return _string.End(); }
 //!
-template <class T> auto end(const String& _string)->decltype(_string.End()) { return _string.End(); }
+inline auto end(const String& _string)->decltype(_string.End()) { return _string.End(); }
 
 //----------------------------------------------------------------------------//
 // StringHash 
@@ -1139,19 +1320,133 @@ struct StringHash
 };
 
 //----------------------------------------------------------------------------//
-// NonCopyable
+// Function
 //----------------------------------------------------------------------------//
 
-class NonCopyable
-{
-public:
-	NonCopyable(void) { }
-	~NonCopyable(void) { }
+template <class F> void* FuncPtr(F _func) { union { F f; void* p; }_fp = { _func }; return _fp.p; }
+template <class F> F FuncCast(void* _func) { union { void* p; F f; }_fp = { _func }; return _fp.f; }
 
-private:
-	NonCopyable(const NonCopyable&) = delete;
-	NonCopyable& operator = (const NonCopyable&) = delete;
+// example:
+// auto func = Function<void(int)>(Func); // c-func
+// func = Function<void(int)>(&var, &MyClass::Func); // method
+// func(0);	// call
+
+template <class F> struct Function;
+template <class R, class... A> struct Function<R(A...)>
+{
+	// TODO: calling convention
+	typedef R(*Invoke)(void*, void*, A&&...);
+
+	typedef R(*Ptr)(A...);
+	typedef R(Type)(A...);
+
+	Invoke invoke;
+	void* func;
+	void* self;
+
+	Function(void) : invoke(nullptr), func(nullptr), self(nullptr) { }
+	Function(R(*_func)(A...)) : invoke(InvokeFunc), func(FuncPtr(_func)), self(nullptr) { }
+	template <class C> Function(C* _self, R(C::*_func)(A...)) : invoke(InvokeMethod<C>), func(FuncPtr(_func)), self(_self) { ASSERT(_self != nullptr); }
+	template <class C> Function(const C* _self, R(C::*_func)(A...) const) : invoke(InvokeConstMethod<C>), func(FuncPtr(_func)), self(const_cast<C*>(_self)) { ASSERT(_self != nullptr); }
+	operator bool(void) const { return func != nullptr; }
+
+	R operator () (A... _args) const
+	{
+		ASSERT(func != nullptr);
+		return invoke(self, func, Forward<A>(_args)...);
+	}
+
+	static R InvokeFunc(void* _self, void* _func, A&&... _args)
+	{
+		typedef R(*Func)(A...);
+		return FuncCast<Func>(_func)(Forward<A>(_args)...);
+	}
+
+	template <class C> static R InvokeMethod(void* _self, void* _func, A&&... _args)
+	{
+		ASSERT(_self != nullptr);
+		typedef R(C::*Func)(A...);
+		return (*((C*)_self).*FuncCast<Func>(_func))(Move(_args)...);
+	}
+
+	template <class C> static R InvokeConstMethod(void* _self, void* _func, A&&... _args)
+	{
+		ASSERT(_self != nullptr);
+		typedef R(C::*Func)(A...) const;
+		return (*((const C*)_self).*FuncCast<Func>(_func))(Move(_args)...);
+	}
 };
+
+template <class R, class... A> Function<R(A...)> MakeFunction(R(*_func)(A...))
+{
+	return Function<R(A...)>(_func);
+}
+template <class C, class R, class... A> Function<R(A...)> MakeFunction(C* _self, R(C::*_func)(A...))
+{
+	return Function<R(A...)>(_self, _func);
+}
+template <class C, class R, class... A> Function<R(A...)> MakeFunction(const C* _self, R(C::*_func)(A...) const)
+{
+	return Function<R(A...)>(_self, _func);
+}
+
+//----------------------------------------------------------------------------//
+// ArgsHolder
+//----------------------------------------------------------------------------//
+
+template <class T> struct TArgType { typedef T Type; };
+template <class T> struct TArgType<const T> { typedef T Type; };
+template <class T> struct TArgType<T&> { typedef T& Type; };
+template <class T> struct TArgType<const T&> { typedef T Type; };
+template <class T> struct TArgType<T&&> { typedef T Type; };
+
+template <int I, typename T> struct TArgHolder
+{
+	typename TypeWithoutRef<T>::Type arg;
+
+	TArgHolder(void) = default;
+	TArgHolder(typename TypeWithoutRef<T>::Type&& _arg) : arg(Forward<T>(_arg)) { }
+	
+	//typename TypeWithoutRef<T>::Type* arg;
+	//TArgHolder(typename TypeWithoutRef<T>::Type* _arg) : arg(_arg) { }
+	//~TArgHolder(void) { delete arg; }
+};
+
+template <int... I> struct TIndicesTuple { };
+
+template <int N, typename I = TIndicesTuple<>> struct TArgIndexer;
+template <int N, int... I> struct TArgIndexer<N, TIndicesTuple<I...>> : TArgIndexer <N - 1, TIndicesTuple<I..., sizeof...(I)>> { };
+template <int... I> struct TArgIndexer<0, TIndicesTuple<I...>>
+{
+	typedef TIndicesTuple<I...> Tuple;
+};
+
+template <typename I, typename... A> struct TArgsHolder;
+template <int... I, typename... A> struct TArgsHolder <TIndicesTuple<I...>, A...> : TArgHolder<I, A>...
+{
+	//TArgsHolder(A&&... _args = A...()) : TArgHolder<I, A>(new TypeWithoutRef<A>::Type(_args))... {}
+	//TArgsHolder(void) = default;
+	TArgsHolder(A&&... _args = A()...) : TArgHolder<I, A>(Forward<A>(_args))... {}
+
+	template <class R, class F, int... I> R Invoke(const Function<F>& _func, const TIndicesTuple<I...>&)
+	{
+		//return _func(static_cast<typename TypeWithoutRef<A>::Type&>(*TArgHolder<I, A>::arg)...);
+		return _func(TArgHolder<I, A>::arg...);
+	}
+};
+
+template <class... A> struct ArgsHolder : TArgsHolder<typename TArgIndexer<sizeof...(A)>::Tuple, A...>
+{
+	typedef typename TArgsHolder<typename TArgIndexer<sizeof...(A)>::Tuple, A...> Type;
+	typedef typename TArgIndexer<sizeof...(A)> Indexer;
+	static typename const Indexer::Tuple Indices;
+
+	template <class R> static R InvokeFunc(const Function<R(A...)>& _func, Type& _args)
+	{
+		return _args.Invoke<R, R(A...)>(_func, Indices);
+	}
+};
+template <class... A> const typename ArgsHolder<A...>::Indexer::Tuple ArgsHolder<A...>::Indices;
 
 //----------------------------------------------------------------------------//
 // Singleton
@@ -1214,11 +1509,11 @@ public:
 	SharedPtr(void) : p(nullptr) { }
 	~SharedPtr(void) { if (p) p->Release(); }
 	SharedPtr(const T* _p) : p(const_cast<T*>(_p)) { if (p) p->AddRef(); }
-	SharedPtr(const SharedPtr& _p) : Ptr(_p.p) {}
+	SharedPtr(const SharedPtr& _p) : SharedPtr(_p.p) {}
 	SharedPtr& operator = (const T* _p) { if (_p) _p->AddRef(); if (p) p->Release(); p = const_cast<T*>(_p); return *this; }
 	SharedPtr& operator = (const SharedPtr& _p) { return *this = _p.p; }
 	operator T* (void) const { return const_cast<T*>(p); }
-	T* operator & (void) const { return const_cast<T*>(p); }
+	//T* operator & (void) const { return const_cast<T*>(p); }
 	T* operator -> (void) const { return const_cast<T*>(p); }
 	T& operator * (void) const { return *const_cast<T*>(p); }
 	template <class X> X* Cast(void) const { return static_cast<X*>(const_cast<T*>(p)); }
@@ -1233,18 +1528,18 @@ protected:
 
 #ifdef _HAVE_TYPE_NAMES
 #define RTTI(TYPE) \
-	enum : uint { Type = String::ConstHash(TYPE) }; \
-	uint GetType(void) override { return Type; } \
-	bool IsTypeOf(uint _type) override { return _type == Type || __super::IsTypeOf(_type); } \
-	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::Type); } \
+	enum : uint { TypeID = String::ConstHash(TYPE) }; \
+	uint GetTypeID(void) override { return TypeID; } \
+	bool IsTypeOf(uint _type) override { return _type == TypeID || __super::IsTypeOf(_type); } \
+	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::TypeID); } \
 	static constexpr const char* TypeName = TYPE; \
 	const char* GetTypeName(void) override { return TypeName; }
 #else
 #define RTTI(TYPE) \
-	enum : uint { Type = String::ConstHash(TYPE) }; \
-	uint GetType(void) override { return Type; } \
-	bool IsTypeOf(uint _type) override { return _type == Type || __super::IsTypeOf(_type); } \
-	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::Type); }
+	enum : uint { TypeID = String::ConstHash(TYPE) }; \
+	uint GetTypeID(void) override { return TypeID; } \
+	bool IsTypeOf(uint _type) override { return _type == TypeID || __super::IsTypeOf(_type); } \
+	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::TypeID); }
 #endif
 
 typedef SharedPtr<class Object> ObjectPtr;
@@ -1252,10 +1547,10 @@ typedef SharedPtr<class Object> ObjectPtr;
 class Object : public RefCounted
 {
 public:
-	enum : uint { Type = String::ConstHash("Object") };
-	virtual uint GetType(void) { return Type; }
-	virtual bool IsTypeOf(uint _type) { return _type == Type; }
-	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::Type); }
+	enum : uint { TypeID = String::ConstHash("Object") };
+	virtual uint GetTypeID(void) { return TypeID; }
+	virtual bool IsTypeOf(uint _type) { return _type == TypeID; }
+	template <class T> bool IsTypeOf(void) { return IsTypeOf(T::TypeID); }
 
 #ifdef _HAVE_TYPE_NAMES
 	static constexpr const char* TypeName = "Object";
@@ -1314,13 +1609,15 @@ public:
 #ifdef _HAVE_TYPE_NAMES
 		return GetOrCreateTypeInfo(T::TypeName);
 #else
-		return GetOrCreateTypeInfo(T::Type);
+		return GetOrCreateTypeInfo(T::TypeID);
 #endif
 	}
 
+	//ObjectPtr Create(uint _type);
+
 	template <class T> SharedPtr<T> Create(void)
 	{
-		auto _iter = m_types.Find(T::Type);
+		auto _iter = m_types.Find(T::TypeID);
 		if (_iter != m_types.End())
 			return _iter->second.Factory().Cast<T>();
 

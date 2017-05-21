@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Assets.hpp"
+#include "File.hpp"
 
 //----------------------------------------------------------------------------//
 // Data
@@ -53,7 +54,7 @@ void LZ4Decompress(const void* _src, void* _dst, size_t _srcSize, size_t _dstSiz
 		if (_dstp + _length > _dste /*|| _srcp + _length > _srce*/)
 			break; // out of range
 
-		MemoryCopy(_dstp, _srcp, _length);
+		memcpy(_dstp, _srcp, _length);
 		_srcp += _length;
 		_dstp += _length;
 
@@ -70,7 +71,7 @@ void LZ4Decompress(const void* _src, void* _dst, size_t _srcSize, size_t _dstSiz
 		_length = _marker & 0xf;
 		if (_length == 0xf)
 		{
-			for (uint8 s = 0xff; _srcp < _srce8 && s == 0xff;)
+			for (uint8 s = 0xff; _srcp < _srce6 && s == 0xff;)
 				_length += (s = *_srcp++);
 		}
 
@@ -125,11 +126,21 @@ Assets::Assets(void)
 	LOG_NODE("Unpack assets");
 
 	uint16 _size = *(const uint16*)gPackedData;
-	m_data = new uint8[_size];
 
 	LOG("%d bytes x%.2f --> %d bytes", sizeof(gPackedData) - 2, sizeof(gPackedData) > 2 ? ((float)_size / (float)(sizeof(gPackedData) - 2)) : 1.f, _size);
 
+#if 1
+	m_data = new uint8[_size];
 	LZ4Decompress(gPackedData + 2, m_data, sizeof(gPackedData) - 2, _size);
+#else
+	m_data = (uint8*)(gPackedData + 2);
+#endif
+
+#if 0
+	File _f;
+	_f.SetData(m_data, _size, true);
+	_f.Save("data.bin");
+#endif
 
 	int _num = 0;
 	for (uint8* p = m_data, *e = m_data + _size; p < e;)

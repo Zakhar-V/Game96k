@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Converter">
+      <UniqueIdentifier>{fb113be9-224f-47d2-a7ff-4ee221490ecd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{32e6a898-a725-4a99-bd2f-66dabbd16a5f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ModelConverter.cpp">
+      <Filter>Converter</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

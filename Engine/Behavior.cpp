@@ -7,8 +7,23 @@
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-void Behavior::_Register(void){	gBehaviorSystem->_Register(this);}//----------------------------------------------------------------------------//
-void Behavior::_Unregister(void){	gBehaviorSystem->_Unregister(this);}//----------------------------------------------------------------------------//
+Behavior::Behavior(void)
+{
+	m_eventMask |= Component::Updates;
+}
+//----------------------------------------------------------------------------//
+Behavior::~Behavior(void)
+{
+}
+//----------------------------------------------------------------------------//
+void Behavior::_Register(bool _newState)
+{
+	if (_newState)
+		_Start();
+	else
+		_Stop();
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // BehaviorSystem 
@@ -18,8 +33,6 @@ void Behavior::_Unregister(void){	gBehaviorSystem->_Unregister(this);}//----
 BehaviorSystem::BehaviorSystem(void)
 {
 	LOG_NODE("Create BehaviorSystem");
-
-	gReflection->GetOrCreateTypeInfo<Behavior>()->SetFactory([]() { return ObjectPtr(new Behavior); });
 }
 //----------------------------------------------------------------------------//
 BehaviorSystem::~BehaviorSystem(void)
@@ -27,17 +40,18 @@ BehaviorSystem::~BehaviorSystem(void)
 	LOG_NODE("Destroy BehaviorSystem");
 }
 //----------------------------------------------------------------------------//
-void BehaviorSystem::_Register(Behavior* _behavior)
+EventResult BehaviorSystem::_OnEvent(int _type, void* _data)
 {
-	Link(m_activeBehaviors, _behavior, _behavior->m_prevBehavior);
-	_behavior->_Start();
-}
-//----------------------------------------------------------------------------//
-void BehaviorSystem::_Unregister(Behavior* _behavior)
-{
-	//TODO: active/inactive ?
-	Unlink(m_activeBehaviors, _behavior, _behavior->m_prevBehavior);
-	_behavior->_OnDestroy();
+	switch (_type)
+	{
+	case SystemEvent::Update:
+	{
+		// ...
+
+	} break;
+	}
+
+	return ER_Pass;
 }
 //----------------------------------------------------------------------------//
 

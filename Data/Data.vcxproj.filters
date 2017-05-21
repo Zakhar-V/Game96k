@@ -7,11 +7,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{cecbecde-e229-4bd2-aee3-68377ecaf385}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="MakeData.bat">
-      <Filter>Scripts</Filter>
-    </None>
+    <Filter Include="Models">
+      <UniqueIdentifier>{8767717d-9dbc-4921-bdf8-4afc0bd31bac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Common.glsl">
@@ -26,5 +24,7 @@
     <Text Include="Quad-GS.glsl">
       <Filter>Shaders</Filter>
     </Text>
+    <Text Include="Models.blend" />
+    <Text Include="MakeData.bat" />
   </ItemGroup>
 </Project>

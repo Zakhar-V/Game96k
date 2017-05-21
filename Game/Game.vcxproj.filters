@@ -13,6 +13,9 @@
     <Filter Include="Data">
       <UniqueIdentifier>{f5cd167b-863c-4d37-8fa7-4749c57c4dfa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Docs">
+      <UniqueIdentifier>{0ff92431-461f-4aae-bd20-ab3fdbbfe372}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="Compress.bat">
@@ -44,9 +47,6 @@
     <ClCompile Include="..\Engine\OpenGL.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\Engine.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="..\Engine\Image.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -68,13 +68,29 @@
     <ClCompile Include="..\Engine\Renderer.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\Resource.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="..\Engine\UI.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="..\Engine\Behavior.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Timer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Thread.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Mesh.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Material.cpp" />
+    <ClCompile Include="..\Engine\Physics.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Pathfinding.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\_crt.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
   </ItemGroup>
@@ -115,9 +131,6 @@
     <ClInclude Include="..\Engine\Renderer.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="..\Engine\Resource.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="..\Engine\Engine.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -127,14 +140,39 @@
     <ClInclude Include="..\Engine\Behavior.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\Project.txt" />
-    <Text Include="..\ToDo.txt" />
+    <ClInclude Include="..\Engine\Timer.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Thread.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Mesh.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Material.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Physics.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Pathfinding.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\Engine\Engine.natvis">
       <Filter>Engine</Filter>
     </Natvis>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Docs\Project.txt">
+      <Filter>Docs</Filter>
+    </Text>
+    <Text Include="..\Docs\ToDo.txt">
+      <Filter>Docs</Filter>
+    </Text>
   </ItemGroup>
 </Project>

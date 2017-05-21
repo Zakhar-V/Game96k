@@ -11,8 +11,7 @@ UISystem::UISystem(void)
 {
 	LOG_NODE("Create UISystem");
 
-	gReflection->GetOrCreateTypeInfo<UIElement>()->SetFactory([]() { return ObjectPtr(new UIElement); });
-
+	//gReflection->GetOrCreateTypeInfo<UIImage>()->SetFactory([]() { return ObjectPtr(new UIImage); });
 }
 //----------------------------------------------------------------------------//
 UISystem::~UISystem(void)

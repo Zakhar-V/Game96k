@@ -12,7 +12,7 @@ System* System::s_last = nullptr;
 //----------------------------------------------------------------------------//
 System::System(void)
 {
-	Link(s_first, s_last, this, m_prev);
+	LinkLast(s_first, s_last, this, m_prev);
 }
 //----------------------------------------------------------------------------//
 System::~System(void)

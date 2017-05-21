@@ -4,10 +4,7 @@ layout(triangle_strip, max_vertices = 4) out;
 void MakeVertex(in vec3 offset, in vec2 coord)
 {
 	OutInstanceID = InInstanceID[0];
-	OutWorldPos = vec4(InPos[0].xyz + offset, 1);
-#ifndef PARTICLE
-	OutWorldPos = WorldMat[InInstanceID[0]] * OutWorldPos;
-#endif
+	OutWorldPos = InWorldMat[0] * vec4(InPos[0].xyz + offset, 1);
 	OutTexCoord = InTexCoord[0] + InTexSize[0] * coord;
 	OutColor = InColor[0];
 	gl_Position = ViewProjMat * OutWorldPos;
@@ -19,13 +16,12 @@ void main()
 {
 	mat3 mat = mat3(UNIT_X * InSize[0].x, UNIT_Y * InSize[0].y, UNIT_Z);
 	
-	//TODO: do rotate around z
+	//TODO: do rotate around z (InSize[0].z)
 
 #ifdef BILLBOARD_Y
 	mat = mat3(NormMat[0], UNIT_Y, UNIT_Z) * mat;
-#elif defined(BILLBOARD) || defined(PARTICLE)
+#elif defined(BILLBOARD)
 	mat = NormMat * mat;
-#elif defined(SPRITE)
 #endif	
 
 	MakeVertex(mat * vec3(.5, .5, 0), vec2(1, 1)); // rb

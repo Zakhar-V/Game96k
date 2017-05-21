@@ -97,6 +97,8 @@
       <Command>cd $(ProjectDir)
 md Temp
 copy $(OutDir)Packer.exe $(ProjectDir)Temp
+copy $(OutDir)ModelConverter.exe $(ProjectDir)Temp
+copy $(OutDir)assimp-vc140-mt.dll $(ProjectDir)Temp 
 MakeData.bat
 
 </Command>
@@ -115,6 +117,8 @@ MakeData.bat
       <Command>cd $(ProjectDir)
 md Temp
 copy $(OutDir)Packer.exe $(ProjectDir)Temp
+copy $(OutDir)ModelConverter.exe $(ProjectDir)Temp
+copy $(OutDir)assimp-vc140-mt.dll $(ProjectDir)Temp 
 MakeData.bat
 
 </Command>
@@ -137,6 +141,8 @@ MakeData.bat
       <Command>cd $(ProjectDir)
 md Temp
 copy $(OutDir)Packer.exe $(ProjectDir)Temp
+copy $(OutDir)ModelConverter.exe $(ProjectDir)Temp
+copy $(OutDir)assimp-vc140-mt.dll $(ProjectDir)Temp 
 MakeData.bat
 
 </Command>
@@ -159,12 +165,17 @@ MakeData.bat
       <Command>cd $(ProjectDir)
 md Temp
 copy $(OutDir)Packer.exe $(ProjectDir)Temp
+copy $(OutDir)ModelConverter.exe $(ProjectDir)Temp
+copy $(OutDir)assimp-vc140-mt.dll $(ProjectDir)Temp 
 MakeData.bat
 
 </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <Text Include="Models.blend">
+      <FileType>Document</FileType>
+    </Text>
     <Text Include="Quad-GS.glsl">
       <FileType>Document</FileType>
     </Text>
@@ -177,7 +188,9 @@ MakeData.bat
     <Text Include="Generic-VS.glsl">
       <FileType>Document</FileType>
     </Text>
-    <None Include="MakeData.bat" />
+    <Text Include="MakeData.bat">
+      <FileType>Document</FileType>
+    </Text>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

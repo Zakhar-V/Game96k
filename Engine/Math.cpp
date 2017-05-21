@@ -29,8 +29,13 @@ float Sqrt(float _x)
 float RSqrt(float _x)
 {
 	float _r;
-	__asm rsqrtss xmm0, _x
-	__asm movss _r, xmm0
+	//__asm rsqrtss xmm0, _x
+	//__asm movss _r, xmm0
+	__asm fld1
+	__asm fld _x
+	__asm fsqrt
+	__asm fdiv
+	__asm fstp _r
 	return _r;
 }
 //----------------------------------------------------------------------------//
@@ -360,11 +365,115 @@ void Unpack(float* _dst, const int8* _src, uint _num)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// Random
+//----------------------------------------------------------------------------//
+
+static int g_randomSeed = 0;
+
+//----------------------------------------------------------------------------//
+uint RandomInt(int* _rseed)
+{
+	return (uint)(*_rseed = 69069 * *_rseed + 1);
+}
+//----------------------------------------------------------------------------//
+float RandomRange(int* _rseed, float _min, float _max)
+{
+	return Mix(_min, _max, RandomInt(_rseed) * (1.0f / 0xffffffff));
+}
+//----------------------------------------------------------------------------//
+float Random01(int* _rseed)
+{
+	return RandomRange(_rseed, 0, 1);
+}
+//----------------------------------------------------------------------------//
+uint RandomInt(void)
+{
+	return RandomInt(&g_randomSeed);
+}
+//----------------------------------------------------------------------------//
+float RandomRange(float _min, float _max)
+{
+	float _f =  RandomRange(&g_randomSeed, _min, _max);
+	//LOG("%f", _f);
+	return _f;
+}
+//----------------------------------------------------------------------------//
+float Random01(void)
+{
+	return RandomRange(&g_randomSeed, 0, 1);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Noise
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+float Noise2d(int _x, int _y, int _rseed)
+{
+	int _n = _x + _y * _rseed;
+	_n = (_n << 13) ^ _n;
+	return (1.0f - ((_n * (_n * _n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+}
+//----------------------------------------------------------------------------//
+float SmoothedNoise2d(int _x, int _y, int _rseed)
+{
+	float _n = 0;
+	_n += (Noise2d(_x - 1, _y - 1, _rseed) +
+		Noise2d(_x + 1, _y - 1, _rseed) +
+		Noise2d(_x - 1, _y + 1, _rseed) +
+		Noise2d(_x + 1, _y + 1, _rseed)) * 0.0625f; // corners 1/16 
+	_n += (Noise2d(_x - 1, _y, _rseed) +
+		Noise2d(_x + 1, _y, _rseed) +
+		Noise2d(_x, _y - 1, _rseed) +
+		Noise2d(_x, _y + 1, _rseed)) * 0.125f; // sides 1/8
+	_n += Noise2d(_x, _y, _rseed) * 0.25f; // center 1/4
+	return _n;
+}
+//----------------------------------------------------------------------------//
+float InterpolatedNoise2d(float _x, float _y, int _rseed)
+{
+	int _ix = (int)_x, _iy = (int)_y;
+	float _tx = _x - _ix, _ty = _y - _iy;
+	float _v0 = SmoothedNoise2d(_ix, _iy, _rseed);
+	float _v1 = SmoothedNoise2d(_ix + 1, _iy, _rseed);
+	float _v2 = SmoothedNoise2d(_ix, _iy + 1, _rseed);
+	float _v3 = SmoothedNoise2d(_ix + 1, _iy + 1, _rseed);
+	//return Mix(Mix(_v0, _v1, _tx), Mix(_v2, _v3, _tx), _ty);
+	return Cerp(Cerp(_v0, _v1, _tx), Cerp(_v2, _v3, _tx), _ty);
+}
+//----------------------------------------------------------------------------//
+float Perlin2d(float _x, float _y, int _rseed, uint _iterations)
+{
+	float _amplitude = 1;
+	float _frequency = 1;
+	float _persistence = .5f;
+
+	float _r = 0;
+	while (_iterations--)
+	{
+		_r += InterpolatedNoise2d(_x*_frequency, _y*_frequency, _rseed) * _amplitude;
+		_amplitude *= _persistence;
+		_frequency *= 2;
+	}
+	return (1 - _r) * .5f;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Vector2
 //----------------------------------------------------------------------------//
 
 const Vector2 Vector2::Zero(0);
 const Vector2 Vector2::One(1);
+
+
+//----------------------------------------------------------------------------//
+// IntVector2
+//----------------------------------------------------------------------------//
+
+const IntVector2 IntVector2::Zero(0);
+const IntVector2 IntVector2::One(1);
 
 //----------------------------------------------------------------------------//
 // Vector3
@@ -388,16 +497,18 @@ const Vector4 Vector4::Identity(0, 0, 0, 1);
 // Quaternion
 //----------------------------------------------------------------------------//
 
-const Quaternion Quaternion::Zero(0);
-const Quaternion Quaternion::Identity(1);
+const Quaternion Quaternion::Zero(0, 0, 0, 0);
+const Quaternion Quaternion::Identity(0, 0, 0, 1);
 
 //----------------------------------------------------------------------------//
 Quaternion& Quaternion::Mul(const Quaternion& _rhs)
 {
-	return Set(w * _rhs.x + x * _rhs.w + y * _rhs.z - z * _rhs.y,
+	return Set(
+		w * _rhs.x + x * _rhs.w + y * _rhs.z - z * _rhs.y,
 		w * _rhs.y + y * _rhs.w + z * _rhs.x - x * _rhs.z,
 		w * _rhs.z + z * _rhs.w + x * _rhs.y - y * _rhs.x,
-		w * _rhs.w - x * _rhs.x - y * _rhs.y - z * _rhs.z);
+		w * _rhs.w - x * _rhs.x - y * _rhs.y - z * _rhs.z
+	);
 }
 //----------------------------------------------------------------------------//
 Vector3 Quaternion::Transform(const Vector3& _v) const
@@ -539,8 +650,60 @@ Quaternion& Quaternion::FromRotationMatrix(const float* _r0, const float* _r1, c
 Quaternion& Quaternion::FromAxisAngle(const Vector3& _axis, float _angle)
 {
 	float _s, _c;
-	SinCos(_angle * 0.5f, _s, _c);
+	SinCos(_angle * .5f, _s, _c);
 	return Set(_axis.x * _s, _axis.y * _s, _axis.z * _s, _c);
+}
+//----------------------------------------------------------------------------//
+Quaternion& Quaternion::FromLookRotation(const Vector3& _dir, const Vector3& _up)
+{
+	Vector3 _z = _dir.Copy().Normalize();
+	Vector3 _y = _z.Cross(_up).Copy().Normalize().Cross(_z);
+	Vector3 _x = _y.Cross(_z);
+	return FromRotationMatrix(*_x, *_y, *_z);
+}
+//----------------------------------------------------------------------------//
+Quaternion& Quaternion::FromRotationTo(const Vector3& _start, const Vector3& _end)
+{
+	Vector3 _ns = _start.Copy().Normalize();
+	Vector3 _ne = _end.Copy().Normalize();
+	float d = _ns.Dot(_ne);
+
+	if (d > -1 + EPSILON)
+	{
+		Vector3 _c = _ns.Cross(_ne);
+		float _s = Sqrt((1 + d) * 2);
+		float _invS = 1 / _s;
+		x = _c.x * _invS;
+		y = _c.y * _invS;
+		z = _c.z * _invS;
+		w = 0.5f * _s;
+	}
+	else
+	{
+		Vector3 _axis = Vector3::UnitX.Cross(_ns);
+		if (_axis.LengthSq() < EPSILON2)
+			_axis = Vector3::UnitY.Cross(_ns);
+
+		FromAxisAngle(_axis, HALF_PI);
+	}
+	return *this;
+}
+//----------------------------------------------------------------------------//
+float Quaternion::Yaw(void) const
+{
+	return ASin(-2 * (x*z - w*y));
+	//return ATan2(2 * (y*z + w*x), w*w - x*x - y*y + z*z);
+}
+//----------------------------------------------------------------------------//
+float Quaternion::Pitch(void) const
+{
+	return ATan2(2 * (y*z + w*x), w*w - x*x - y*y + z*z);
+	//return ASin(-2 * (x*z - w*y));
+}
+//----------------------------------------------------------------------------//
+float Quaternion::Roll(void) const
+{
+	return ATan2(2 * (x*y + w*z), w*w + x*x - y*y - z*z);
 }
 //----------------------------------------------------------------------------//
 
@@ -550,6 +713,13 @@ Quaternion& Quaternion::FromAxisAngle(const Vector3& _axis, float _angle)
 
 const Matrix44 Matrix44::Zero(0.f);
 const Matrix44 Matrix44::Identity(1);
+const Matrix44 Matrix44::Flip = 
+{
+	1, 0, 0, 0,
+	0, -1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1,
+};
 
 //----------------------------------------------------------------------------//
 Matrix44::Matrix44(float _00, float _01, float _02, float _03,
@@ -763,38 +933,6 @@ Matrix44& Matrix44::Transpose(void)
 	return *this;
 }
 //----------------------------------------------------------------------------//
-Matrix44& Matrix44::CreatePerspective(float _fov, float _aspect, float _near, float _far)
-{
-	if (_aspect != _aspect)
-		_aspect = 1; // NaN
-	if (_far == _near)
-		_far = _near + EPSILON;
-	float _h = 1 / Tan(_fov * 0.5f);
-	float _w = _h / _aspect;
-	float _d = (_far - _near);
-	float _q = -(_far + _near) / _d;
-	float _qn = -2 * (_far * _near) / _d;
-	SetZero();
-	m00 = _w;
-	m11 = _h;
-	m22 = _q;
-	m23 = _qn;
-	m32 = -1;
-	return *this;
-}
-//----------------------------------------------------------------------------//
-Matrix44& Matrix44::CreateOrtho(float _left, float _right, float _bottom, float _top, float _znear, float _zfar)
-{
-	SetIdentity();
-	m00 = 2 / (_right - _left);
-	m03 = (_right + _left) / (_left - _right);
-	m11 = 2 / (_top - _bottom);
-	m13 = (_top + _bottom) / (_bottom - _top);
-	m22 = 1 / (_znear - _zfar);
-	m23 = _znear / (_znear - _zfar);
-	return *this;
-}
-//----------------------------------------------------------------------------//
 Matrix44& Matrix44::CreateOrtho2D(float _width, float _height)
 {
 	SetIdentity();
@@ -802,33 +940,70 @@ Matrix44& Matrix44::CreateOrtho2D(float _width, float _height)
 	m03 = -1; // offset.x
 	m11 = -2 / _height; // scale.y
 	m13 = 1; // offset.y
-	m22 = -0.5f;
-	m23 = 0.5f;
+	//m22 = -0.5f;
+	//m23 = 0.5f;
+	m22 = -1;
+	m23 = 0;
+	return *this;
+}
+//----------------------------------------------------------------------------//
+Matrix44& Matrix44::CreateProjection(float _fov, float _aspect, float _near, float _far, float _zoom, const Vector2& _offset, float _height)
+{
+	SetZero();
+
+	if (_aspect != _aspect)
+		_aspect = 1; // NaN
+	if (_far == _near)
+		_far = _near + EPSILON;
+
+	if (_fov > 0)
+	{
+		float _h = 1 / Tan(_fov * 0.5f) * _zoom;
+		float _w = _h / _aspect;
+		float _d = (_far - _near);
+#if 1
+		float _q = (_far + _near) / _d;
+		float _r = -2 * (_far * _near) / _d;
+#else
+		float q = _far / _d;
+		float r = -q * _near;
+#endif
+		m00 = _w;
+		//m02 = _offset.x * 2;
+		m11 = _h;
+		//m12 = _offset.y * 2;
+		m22 = _q;
+		m23 = _r;
+		m32 = 1;
+	}
+	else // ortho
+	{
+		float _h = 1 / (_height * 0.5f) * _zoom;
+		float _w = _h / _aspect;
+#if 1
+		float _q = 2 / _far;
+		float _r = -1;
+#else
+		float _q = 1 / _far;
+		float _r = 0;
+#endif
+		m00 = _w;
+		m03 = _offset.x * 2;
+		m11 = _h;
+		m13 = _offset.y * 2;
+		m22 = _q;
+		m23 = _r;
+		m33 = 1;
+
+		*this = *this * Flip;
+	}
+
 	return *this;
 }
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-// Triangle
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-bool Triangle::Intersects(const Vector3& _t0, const Vector3& _t1, const Vector3& _t2, const Ray& _ray, float* _dist)
-{
-	Plane _plane;
-	_plane.FromTriangle(_t0, _t1, _t2).Normalize();
-	float _d = _plane.Distance(_ray);
-	Vector3 _p = _ray * _d;
-	if (Normal(_t1, _t0, _p).Dot(_plane.normal) >= 0
-		&& Normal(_t2, _t1, _p).Dot(_plane.normal) >= 0
-		&& Normal(_t0, _t2, _p).Dot(_plane.normal) >= 0)
-	{
-		if (_dist)
-			*_dist = _d;
-		return true;
-	}
-	return false;
-}
+// Ray
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
@@ -879,6 +1054,19 @@ Matrix44 Plane::GetReflectionMatrix(void) const
 	return _m;
 }
 //----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Rect
+//----------------------------------------------------------------------------//
+
+const Rect Rect::Zero(0, 0, 0, 0);
+const Rect Rect::Identity(0, 0, 1, 1);
+
+//----------------------------------------------------------------------------//
+// IntRect
+//----------------------------------------------------------------------------//
+
+const IntRect IntRect::Zero(0, 0, 0, 0);
 
 //----------------------------------------------------------------------------//
 // Box
@@ -1062,6 +1250,8 @@ void Frustum::GetPlanes(Plane* _planes, const Matrix44& _m)
 // Dbvt
 //----------------------------------------------------------------------------//
 
+#define _DBVT_STACK_SIZE 128
+
 //----------------------------------------------------------------------------//
 void Dbvt::Insert(Node* _leaf)
 {
@@ -1118,12 +1308,12 @@ uint Dbvt::GetMaxDepth(void)
 //----------------------------------------------------------------------------//
 void Dbvt::Enum(Callback* _cb, bool _withTest)
 {
-	ASSERT(GetMaxDepth() < 64);
-	Node* _stackBase[64];
+	//ASSERT(GetMaxDepth() < _DBVT_STACK_SIZE);
+	Node* _stackBase[_DBVT_STACK_SIZE];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
 
-	DEBUG_CODE(int _maxDepth = 0, _maxDepthWithoutTest = 0, _depth = 1, _numTests = 0);
+	DEBUG_CODE(int _maxDepth = 0, _maxDepthWithoutTest = 0, _depth = 1, _numTests = 0, _numObjects = 0);
 
 	if (m_root) do
 	{
@@ -1138,14 +1328,18 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 			continue;
 		else if (_result == Callback::TR_WithTest)
 		{
-			if (_node->IsNode())
+			if (_node->child[1])
 			{
+				ASSERT(_depth + 2 < _DBVT_STACK_SIZE);
 				*_stack++ = _node->child0;
 				*_stack++ = _node->child1;
 				DEBUG_CODE(_depth += 2);
 			}
 			else
+			{
 				_cb->AddLeaf(_node, _result);
+				DEBUG_CODE(++_numObjects);
+			}
 		}
 		else
 		{
@@ -1158,14 +1352,18 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 				DEBUG_CODE(_maxDepthWithoutTest = Max(_maxDepth, --_depth));
 				//ASSERT(_node->box.Contains(_node->_GetChildBounds()));
 
-				if (_node->IsNode())
+				if (_node->child[1])
 				{
+					ASSERT(_depth + 2 < _DBVT_STACK_SIZE);
 					*_stack2++ = _node->child0;
 					*_stack2++ = _node->child1;
 					DEBUG_CODE(_depth += 2);
 				}
 				else
+				{
 					_cb->AddLeaf(_node, _result);
+					DEBUG_CODE(++_numObjects);
+				}
 
 			} while (_stack2 > _stack);
 		}
@@ -1173,7 +1371,7 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 	} while (_stack > _stackBase);
 
 #if _DEBUG
-	//printf("max depth = %d/%d, num tests = %d\n", _maxDepth, _maxDepthWithoutTest, _numTests);
+	//LOG("max depth = %d/%d, num tests = %d, num objects = %d\n", _maxDepth, _maxDepthWithoutTest, _numTests, _numObjects);
 #endif
 
 }
@@ -1272,8 +1470,8 @@ void Dbvt::_Delete(Node* _node)
 //----------------------------------------------------------------------------//
 void Dbvt::_Clear(void)
 {
-	ASSERT(GetMaxDepth() < 64);
-	Node* _stackBase[64];
+	ASSERT(GetMaxDepth() < _DBVT_STACK_SIZE);
+	Node* _stackBase[_DBVT_STACK_SIZE];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
 	if (m_root) do
@@ -1293,6 +1491,105 @@ void Dbvt::_Clear(void)
 	delete m_free;
 	m_free = nullptr;
 	m_root = nullptr;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Triangle
+//----------------------------------------------------------------------------//
+
+Triangle& Triangle::Create(const Vector3& _a, const Vector3& _b, const Vector3& _c)
+{
+	v[0] = _a;
+	v[1] = _b;
+	v[2] = _c;
+	node.box.Reset().AddVertices(v, 3);
+	plane.FromTriangle(_a, _b, _c);
+
+	return *this;
+}
+//----------------------------------------------------------------------------//
+bool Triangle::Intersects(Triangle* _other, const Matrix44& _matrix)
+{
+	Vector3 _tv[3];
+	for (uint i = 0; i < 3; ++i)
+		_tv[i] = _matrix.Transform(_other->v[i]);
+	Plane _tp;
+	_tp.FromTriangle(_tv[0], _tv[1], _tv[2]);
+
+
+	return false;
+}
+//----------------------------------------------------------------------------//
+bool Triangle::Intersects(const Vector3& _t0, const Vector3& _t1, const Vector3& _t2, const Ray& _ray, float* _dist)
+{
+	Plane _plane;
+	_plane.FromTriangle(_t0, _t1, _t2).Normalize();
+	float _d = _plane.Distance(_ray);
+	Vector3 _p = _ray * _d;
+	if (Normal(_t1, _t0, _p).Dot(_plane.normal) >= 0
+		&& Normal(_t2, _t1, _p).Dot(_plane.normal) >= 0
+		&& Normal(_t0, _t2, _p).Dot(_plane.normal) >= 0)
+	{
+		if (_dist)
+			*_dist = _d;
+		return true;
+	}
+	return false;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// MeshCollisionData
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+void MeshCollisionData::Create(const void* _vertices, uint _stride, const uint16* _indices, uint _numIndices)
+{
+	m_dbvt._Clear();
+	m_triangles.Clear().Reserve(_numIndices / 3);
+
+	if (!_stride)
+		_stride = sizeof(Vector3);
+
+	const uint8* _vb = reinterpret_cast<const uint8*>(_vertices);
+	for (uint i = 0; i + 2 < _numIndices;)
+	{
+		Triangle& _t = m_triangles.Push(Triangle()).Back();
+
+		_t.Create(*reinterpret_cast<const Vector3*>(_vb[_indices[i] * _stride]),
+			*reinterpret_cast<const Vector3*>(_vb[_indices[i + 1] * _stride]),
+			*reinterpret_cast<const Vector3*>(_vb[_indices[i + 2] * _stride]));
+
+		m_dbvt.Insert(&_t.node);
+
+		i += 3;
+	}
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// TerrainCollisionData
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+void TerrainCollisionData::Create(const float* _hmap, uint _hmapWidth, uint _hmapHeight, float _scale, float _width, float _height)
+{
+	m_hmap.Clear().Push(_hmap, _hmapWidth * _hmapHeight);
+	m_hmapWidth = _hmapWidth;
+	m_hmapHeight = _hmapHeight;
+	m_width = _width;
+	m_height = _height;
+
+	for (float& p : m_hmap)
+		p *= _scale;
+}
+//----------------------------------------------------------------------------//
+bool TerrainCollisionData::RayCast(HitInfo& _hit, const Ray& _ray, float _maxDistance)
+{
+	float _distSq = Sqr(_maxDistance);
+
+	return false;
 }
 //----------------------------------------------------------------------------//
 

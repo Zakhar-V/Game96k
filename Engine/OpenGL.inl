@@ -33,7 +33,7 @@
 //_GLFUNC(void, glPointParameteri, GLenum pname, GLint param)_EOL
 //_GLFUNC(void, glPointParameteriv, GLenum pname, const GLint *params)_EOL
 //_GLFUNC(void, glBlendColor, GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)_EOL
-//_GLFUNC(void, glBlendEquation, GLenum mode)_EOL
+_GLFUNC(void, glBlendEquation, GLenum mode)_EOL
 
 // 1.5
 //_GLFUNC(void, glGenQueries, GLsizei n, GLuint *ids)_EOL
@@ -70,20 +70,20 @@ _GLFUNC(void, glGenBuffers, GLsizei n, GLuint *buffers)_EOL
 //_GLFUNC(void, glDeleteProgram, GLuint program)_EOL
 //_GLFUNC(void, glDeleteShader, GLuint shader)_EOL
 //_GLFUNC(void, glDetachShader, GLuint program, GLuint shader)_EOL
-//_GLFUNC(void, glDisableVertexAttribArray, GLuint index)_EOL
+_GLFUNC(void, glDisableVertexAttribArray, GLuint index)_EOL
 _GLFUNC(void, glEnableVertexAttribArray, GLuint index)_EOL
 //_GLFUNC(void, glGetActiveAttrib, GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)_EOL
 //_GLFUNC(void, glGetActiveUniform, GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)_EOL
 //_GLFUNC(void, glGetAttachedShaders, GLuint program, GLsizei maxCount, GLsizei *count, GLuint *shaders)_EOL
 //_GLFUNC(GLint, glGetAttribLocation, GLuint program, const GLchar *name)_EOL
 _GLFUNC(void, glGetProgramiv, GLuint program, GLenum pname, GLint *params)_EOL
-#ifdef _DEBUG_GRAPHICS
+//#ifdef _DEBUG_GRAPHICS
 _GLFUNC(void, glGetProgramInfoLog, GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog)_EOL
-#endif
+//#endif
 //_GLFUNC(void, glGetShaderiv, GLuint shader, GLenum pname, GLint *params)_EOL
 //_GLFUNC(void, glGetShaderInfoLog, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog)_EOL
 //_GLFUNC(void, glGetShaderSource, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *source)_EOL
-//_GLFUNC(GLint, glGetUniformLocation, GLuint program, const GLchar *name)_EOL
+_GLFUNC(GLint, glGetUniformLocation, GLuint program, const GLchar *name)_EOL
 //_GLFUNC(void, glGetUniformfv, GLuint program, GLint location, GLfloat *params)_EOL
 //_GLFUNC(void, glGetUniformiv, GLuint program, GLint location, GLint *params)_EOL
 //_GLFUNC(void, glGetVertexAttribdv, GLuint index, GLenum pname, GLdouble *params)_EOL
@@ -144,8 +144,8 @@ _GLFUNC(void, glGetProgramInfoLog, GLuint program, GLsizei bufSize, GLsizei *len
 //_GLFUNC(void, glVertexAttrib4d, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)_EOL
 //_GLFUNC(void, glVertexAttrib4dv, GLuint index, const GLdouble *v)_EOL
 //_GLFUNC(void, glVertexAttrib4f, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)_EOL
-//_GLFUNC(void, glVertexAttrib4fv, GLuint index, const GLfloat *v)_EOL
-//_GLFUNC(void, glVertexAttrib4iv, GLuint index, const GLint *v)_EOL
+_GLFUNC(void, glVertexAttrib4fv, GLuint index, const GLfloat *v)_EOL
+_GLFUNC(void, glVertexAttrib4iv, GLuint index, const GLint *v)_EOL
 //_GLFUNC(void, glVertexAttrib4s, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)_EOL
 //_GLFUNC(void, glVertexAttrib4sv, GLuint index, const GLshort *v)_EOL
 //_GLFUNC(void, glVertexAttrib4ubv, GLuint index, const GLubyte *v)_EOL
@@ -381,7 +381,7 @@ _GLFUNC(void, glGenProgramPipelines, GLsizei n, GLuint *pipelines)_EOL
 #ifdef _DEBUG_GRAPHICS
 //_GLFUNC(void, glGetProgramPipelineiv, GLuint pipeline, GLenum pname, GLint *params)_EOL
 #endif
-//_GLFUNC(void, glProgramUniform1i, GLuint program, GLint location, GLint v0)_EOL
+_GLFUNC(void, glProgramUniform1i, GLuint program, GLint location, GLint v0)_EOL
 //_GLFUNC(void, glProgramUniform1iv, GLuint program, GLint location, GLsizei count, const GLint *value)_EOL
 //_GLFUNC(void, glProgramUniform1f, GLuint program, GLint location, GLfloat v0)_EOL
 //_GLFUNC(void, glProgramUniform1fv, GLuint program, GLint location, GLsizei count, const GLfloat *value)_EOL

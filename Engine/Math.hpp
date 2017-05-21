@@ -23,6 +23,7 @@ template <typename T> const T& Min(const T& _a, const T& _b, const T& _c) { retu
 template <typename T> const T& Max(const T& _a, const T& _b) { return _a > _b ? _a : _b; }
 template <typename T> const T& Max(const T& _a, const T& _b, const T& _c) { return _a > _b ? (_a > _c ? _a : _c) : (_b > _c ? _b : _c); }
 template <typename T> const T Clamp(T _x, T _l, T _u) { return _x > _l ? (_x < _u ? _x : _u) : _l; }
+template <typename T> const T Clamp01(T _x) { return Clamp<T>(_x, (T)0, (T)1); }
 template <typename T> T Mix(const T& _a, const T& _b, float _t) { return _a + (_b - _a) * _t; }
 
 inline float Radians(float _val) { return _val * RADIANS; }
@@ -37,6 +38,7 @@ float Cos(float _x);
 void SinCos(float _a, float& _s, float& _c);
 float Tan(float _x);
 float ATan2(float _y, float _x);
+inline float ATan(float _x) { return ATan2(_x, 1); }
 float ASin(float _x);
 float ACos(float _x);
 float Log(float _x);
@@ -69,6 +71,27 @@ void Pack(int8* _dst, const float* _src, uint _num);
 void Unpack(float* _dst, const int8* _src, uint _num);
 
 //----------------------------------------------------------------------------//
+// Random
+//----------------------------------------------------------------------------//
+
+uint RandomInt(int* _rseed);
+float RandomRange(int* _rseed, float _min, float _max);
+float Random01(int* _rseed);
+
+uint RandomInt(void);
+float RandomRange(float _min, float _max);
+float Random01(void);
+
+//----------------------------------------------------------------------------//
+// Noise
+//----------------------------------------------------------------------------//
+
+float Noise2d(int _x, int _y, int _rseed);
+float SmoothedNoise2d(int _x, int _y, int _rseed);
+float InterpolatedNoise2d(float _x, float _y, int _rseed);
+float Perlin2d(float _x, float _y, int _rseed, uint _iterations = 4);
+
+//----------------------------------------------------------------------------//
 // Vector2
 //----------------------------------------------------------------------------//
 
@@ -77,6 +100,11 @@ struct Vector2
 	Vector2(void) = default;
 	Vector2(float _s) : x(_s), y(_s) { }
 	Vector2(float _x, float _y) : x(_x), y(_y) { }
+
+	const float operator [] (uint _index) const { return v[_index]; }
+	float& operator [] (uint _index) { return v[_index]; }
+	const float* operator * (void) const { return v; }
+	float* operator * (void) { return v; }
 
 	Vector2 operator - (void) const { return Vector2(-x, -y); }
 	Vector2 operator + (const Vector2& _rhs) const { return Vector2(x + _rhs.x, y + _rhs.y); }
@@ -118,45 +146,53 @@ struct Vector2
 };
 
 //----------------------------------------------------------------------------//
-// Vector2i
+// IntVector2
 //----------------------------------------------------------------------------//
 
-struct Vector2i
+struct IntVector2
 {
-	Vector2i(void) = default;
-	Vector2i(int _s) : x(_s), y(_s) { }
-	Vector2i(int _x, int _y) : x(_x), y(_y) { }
-	Vector2i(const Vector2& _v) : x((int)_v.x), y((int)_v.y) { }
+	IntVector2(void) = default;
+	IntVector2(int _s) : x(_s), y(_s) { }
+	IntVector2(int _x, int _y) : x(_x), y(_y) { }
+	IntVector2(const Vector2& _v) : x((int)_v.x), y((int)_v.y) { }
 	operator Vector2 (void) const { return Vector2((float)x, (float)y); }
 
-	Vector2i operator - (void) const { return Vector2i(-x, -y); }
-	Vector2i operator + (const Vector2i& _rhs) const { return Vector2i(x + _rhs.x, y + _rhs.y); }
-	Vector2i operator - (const Vector2i& _rhs) const { return Vector2i(x - _rhs.x, y - _rhs.y); }
-	Vector2i operator * (const Vector2i& _rhs) const { return Vector2i(x * _rhs.x, y * _rhs.y); }
-	Vector2i operator / (const Vector2i& _rhs) const { return Vector2i(x / _rhs.x, y / _rhs.y); }
-	Vector2i operator * (int _rhs) const { return Vector2i(x * _rhs, y * _rhs); }
-	Vector2i operator / (int _rhs) const { return Vector2i(x / _rhs, y / _rhs); }
-	Vector2i& operator += (const Vector2i& _rhs) { x += _rhs.x, y += _rhs.y; return *this; }
-	Vector2i& operator -= (const Vector2i& _rhs) { x -= _rhs.x, y -= _rhs.y; return *this; }
-	Vector2i& operator *= (const Vector2i& _rhs) { x *= _rhs.x, y *= _rhs.y; return *this; }
-	Vector2i& operator /= (const Vector2i& _rhs) { x /= _rhs.x, y /= _rhs.y; return *this; }
-	Vector2i& operator *= (int _rhs) { x *= _rhs, y *= _rhs; return *this; }
-	Vector2i& operator /= (int _rhs) { x /= _rhs, y /= _rhs; return *this; }
-	friend Vector2i operator / (int _lhs, const Vector2i& _rhs) { return Vector2i(_lhs / _rhs.x, _lhs / _rhs.y); }
-	friend Vector2i operator * (int _lhs, const Vector2i& _rhs) { return Vector2i(_lhs * _rhs.x, _lhs * _rhs.y); }
+	const int operator [] (uint _index) const { return v[_index]; }
+	int& operator [] (uint _index) { return v[_index]; }
+	const int* operator * (void) const { return v; }
+	int* operator * (void) { return v; }
 
-	bool operator == (const Vector2i& _rhs) const { return x == _rhs.x && y == _rhs.y; }
-	bool operator != (const Vector2i& _rhs) const { return x != _rhs.x || y != _rhs.y; }
+	IntVector2 operator - (void) const { return IntVector2(-x, -y); }
+	IntVector2 operator + (const IntVector2& _rhs) const { return IntVector2(x + _rhs.x, y + _rhs.y); }
+	IntVector2 operator - (const IntVector2& _rhs) const { return IntVector2(x - _rhs.x, y - _rhs.y); }
+	IntVector2 operator * (const IntVector2& _rhs) const { return IntVector2(x * _rhs.x, y * _rhs.y); }
+	IntVector2 operator / (const IntVector2& _rhs) const { return IntVector2(x / _rhs.x, y / _rhs.y); }
+	IntVector2 operator * (int _rhs) const { return IntVector2(x * _rhs, y * _rhs); }
+	IntVector2 operator / (int _rhs) const { return IntVector2(x / _rhs, y / _rhs); }
+	IntVector2& operator += (const IntVector2& _rhs) { x += _rhs.x, y += _rhs.y; return *this; }
+	IntVector2& operator -= (const IntVector2& _rhs) { x -= _rhs.x, y -= _rhs.y; return *this; }
+	IntVector2& operator *= (const IntVector2& _rhs) { x *= _rhs.x, y *= _rhs.y; return *this; }
+	IntVector2& operator /= (const IntVector2& _rhs) { x /= _rhs.x, y /= _rhs.y; return *this; }
+	IntVector2& operator *= (int _rhs) { x *= _rhs, y *= _rhs; return *this; }
+	IntVector2& operator /= (int _rhs) { x /= _rhs, y /= _rhs; return *this; }
+	friend IntVector2 operator / (int _lhs, const IntVector2& _rhs) { return IntVector2(_lhs / _rhs.x, _lhs / _rhs.y); }
+	friend IntVector2 operator * (int _lhs, const IntVector2& _rhs) { return IntVector2(_lhs * _rhs.x, _lhs * _rhs.y); }
 
-	Vector2i& Set(const Vector2i& _v) { return *this = _v; }
-	Vector2i& Set(int _s) { x = _s, y = _s; return *this; }
-	Vector2i& Set(int _x, int _y) { x = _x, y = _y; return *this; }
+	bool operator == (const IntVector2& _rhs) const { return x == _rhs.x && y == _rhs.y; }
+	bool operator != (const IntVector2& _rhs) const { return x != _rhs.x || y != _rhs.y; }
+
+	IntVector2& Set(const IntVector2& _v) { return *this = _v; }
+	IntVector2& Set(int _s) { x = _s, y = _s; return *this; }
+	IntVector2& Set(int _x, int _y) { x = _x, y = _y; return *this; }
 
 	union
 	{
 		struct { int x, y; };
 		int v[2];
 	};
+
+	static const IntVector2 Zero;
+	static const IntVector2 One;
 };
 
 //----------------------------------------------------------------------------//
@@ -169,6 +205,9 @@ struct Vector3
 	Vector3(float _s) : x(_s), y(_s), z(_s) { }
 	Vector3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
 	Vector3 Copy(void) const { return *this; }
+
+	Vector3(const Vector2& _v, float _z = 0) : x(_v.x), y(_v.y), z(_z) { }
+	operator const Vector2& (void) const { return *reinterpret_cast<const Vector2*>(v); }
 
 	const float operator [] (uint _index) const { return v[_index]; }
 	float& operator [] (uint _index) { return v[_index]; }
@@ -278,13 +317,29 @@ struct Vector4
 	operator Vector3& (void) { return *(Vector3*)v; }
 	operator const Vector3& (void) const { return *(const Vector3*)v; }
 
+	Vector4 operator - (void) const { return Vector4(-x, -y, -z, -w); }
+	Vector4 operator + (const Vector4& _rhs) const { return Vector4(x + _rhs.x, y + _rhs.y, z + _rhs.z, w + _rhs.w); }
+	Vector4 operator - (const Vector4& _rhs) const { return Vector4(x - _rhs.x, y - _rhs.y, z - _rhs.z, w - _rhs.w); }
+	Vector4 operator * (const Vector4& _rhs) const { return Vector4(x * _rhs.x, y * _rhs.y, z * _rhs.z, w * _rhs.w); }
+	Vector4 operator / (const Vector4& _rhs) const { return Vector4(x / _rhs.x, y / _rhs.y, z / _rhs.z, w / _rhs.w); }
+	Vector4 operator * (float _rhs) const { return Vector4(x * _rhs, y * _rhs, z * _rhs, w * _rhs); }
+	Vector4 operator / (float _rhs) const { return Vector4(x / _rhs, y / _rhs, z / _rhs, w / _rhs); }
+	Vector4& operator += (const Vector4& _rhs) { x += _rhs.x, y += _rhs.y, z += _rhs.z, w += _rhs.w; return *this; }
+	Vector4& operator -= (const Vector4& _rhs) { x -= _rhs.x, y -= _rhs.y, z -= _rhs.z, w -= _rhs.w; return *this; }
+	Vector4& operator *= (const Vector4& _rhs) { x *= _rhs.x, y *= _rhs.y, z *= _rhs.z, w *= _rhs.w; return *this; }
+	Vector4& operator /= (const Vector4& _rhs) { x /= _rhs.x, y /= _rhs.y, z /= _rhs.z, w /= _rhs.w; return *this; }
+	Vector4& operator *= (float _rhs) { x *= _rhs, y *= _rhs, z *= _rhs, w *= _rhs; return *this; }
+	Vector4& operator /= (float _rhs) { x /= _rhs, y /= _rhs, z /= _rhs, w /= _rhs; return *this; }
+	friend Vector4 operator / (float _lhs, const Vector4& _rhs) { return Vector4(_lhs / _rhs.x, _lhs / _rhs.y, _lhs / _rhs.z, _lhs / _rhs.w); }
+	friend Vector4 operator * (float _lhs, const Vector4& _rhs) { return Vector4(_lhs * _rhs.x, _lhs * _rhs.y, _lhs * _rhs.z, _lhs * _rhs.w); }
+
 	Vector4& Set(float _x, float _y, float _z, float _w = 1) { x = _x, y = _y, z = _z, w = _w; return *this; }
 	Vector4& Set(float _s) { x = _s, y = _s, z = _s, w = _s; return *this; }
 	Vector4& Set(const Vector3& _xyz, float _w = 1) { return Set(_xyz.x, _xyz.y, _xyz.z, _w); }
 	Vector4& Set(const Vector4& _other) { return *this = _other; }
 
 	template <class T> Vector4& Unpack(const T* _src) { ::Unpack(v, _src, 4); return *this; }
-	template <class T> Vector4& Pack(T* _dst) { ::Pack(_dst, v, 4); return *this; }
+	template <class T> const Vector4& Pack(T* _dst) const { ::Pack(_dst, v, 4); return *this; }
 
 	union
 	{
@@ -299,6 +354,51 @@ struct Vector4
 };
 
 //----------------------------------------------------------------------------//
+// PackedColor
+//----------------------------------------------------------------------------//
+
+struct PackedColor
+{
+	PackedColor(void) { }
+	constexpr PackedColor(uint _rgba) : r((_rgba >> 24) & 0xff), g((_rgba >> 16) & 0xff), b((_rgba >> 8) & 0xff), a((_rgba >> 0) & 0xff) { }
+	PackedColor(uint8 _r, uint8 _g, uint8 _b, uint8 _a = 0xff) : r(_r), g(_g), b(_b), a(_a) { }
+	PackedColor(const Vector4& _v) { _v.Pack(v); }
+	operator Vector4 (void) const { return Vector4().Unpack(v); }
+
+	const uint8 operator [] (uint _index) const { return v[_index]; }
+	uint8& operator [] (uint _index) { return v[_index]; }
+
+	uint Argb(void) const { return (rgba >> 8) | (a << 24); }
+	uint Abgr(void) const { return (a << 24) | (b << 16) | (g << 8) | r; }
+
+	/*PackedColor& Blend(const PackedColor& _c1, const PackedColor& _c2, const PackedColor& _c3, const PackedColor& _c4)
+	{
+	r = (uint8)(uint(_c1.r + _c2.r + _c3.r + _c4.r) >> 2);
+	g = (uint8)(uint(_c1.g + _c2.g + _c3.g + _c4.g) >> 2);
+	b = (uint8)(uint(_c1.b + _c2.b + _c3.b + _c4.b) >> 2);
+	a = (uint8)(uint(_c1.a + _c2.a + _c3.a + _c4.a) >> 2);
+	return *this;
+	}
+	PackedColor& Blend(const PackedColor& _c1, const PackedColor& _c2)
+	{
+	r = (uint8)(uint(_c1.r + _c2.r) >> 1);
+	g = (uint8)(uint(_c1.g + _c2.g) >> 1);
+	b = (uint8)(uint(_c1.b + _c2.b) >> 1);
+	a = (uint8)(uint(_c1.a + _c2.a) >> 1);
+	return *this;
+	}*/
+
+	union
+	{
+		//uint rgba;
+		struct { uint8 r, g, b, a; };
+		struct { uint8 x, y, z, w; };
+		uint8 v[4];
+		uint32 rgba;
+	};
+};
+
+//----------------------------------------------------------------------------//
 // Quaternion
 //----------------------------------------------------------------------------//
 
@@ -307,7 +407,7 @@ struct Quaternion
 	Quaternion(void) = default;
 
 	Quaternion(float _x, float _z, float _y, float _w) : x(_x), y(_y), z(_z), w(_w) { }
-	Quaternion(float _w) : x(0), y(0), z(0), w(_w) { }
+	//Quaternion(float _w) : x(0), y(0), z(0), w(_w) { }
 	Quaternion Copy(void) const { return *this; }
 
 	Quaternion& Set(const Quaternion& _other) { return *this = _other; }
@@ -329,7 +429,7 @@ struct Quaternion
 	Quaternion& operator += (const Quaternion& _rhs) { x += _rhs.x, y += _rhs.y, z += _rhs.z, w += _rhs.w; return *this; }
 	Quaternion& operator -= (const Quaternion& _rhs) { x -= _rhs.x, y -= _rhs.y, z -= _rhs.z, w -= _rhs.w; return *this; }
 	Quaternion& operator *= (const Quaternion& _rhs) { return Mul(_rhs); }
-	Quaternion& operator *= (float _rhs) { x += _rhs, y += _rhs, z += _rhs, w += _rhs; return *this; }
+	Quaternion& operator *= (float _rhs) { x *= _rhs, y *= _rhs, z *= _rhs, w *= _rhs; return *this; }
 	Quaternion& operator /= (float _rhs) { x += _rhs, y += _rhs, z += _rhs, w += _rhs; return *this; }
 	friend Quaternion operator * (float _lhs, const Quaternion& _rhs) { return Quaternion(_lhs * _rhs.x, _lhs * _rhs.y, _lhs * _rhs.z, _lhs * _rhs.w); }
 	friend Vector3 operator * (const Vector3& _lhs, const Quaternion& _rhs) { return _rhs.Transform(_lhs); }
@@ -340,48 +440,17 @@ struct Quaternion
 	Quaternion& Normalize(void);
 	Quaternion& Inverse(void);
 	Quaternion& UnitInverse(void) { x = -x, y = -y, z = -z; return *this; }
-	Quaternion Nlerp(const Quaternion& _q, float _t, bool _shortestPath = true) const;
-	Quaternion Slerp(const Quaternion& _q, float _t, bool _shortestPath = true) const;
+	Quaternion Nlerp(const Quaternion& _q, float _t, bool _shortestPath = false) const;
+	Quaternion Slerp(const Quaternion& _q, float _t, bool _shortestPath = false) const;
 	void ToRotationMatrix(float* _r0, float* _r1, float* _r2) const;
 	Quaternion& FromRotationMatrix(const float* _r0, const float* _r1, const float* _r2);
 	Quaternion& FromAxisAngle(const Vector3& _axis, float _angle);
+	Quaternion& FromLookRotation(const Vector3& _dir, const Vector3& _up = Vector3::UnitY);
+	Quaternion& FromRotationTo(const Vector3& _start, const Vector3& _end);
 
-
-	Quaternion& FromLookRotation(const Vector3& _dir, const Vector3& _up = Vector3::UnitY)
-	{
-		Vector3 _z = _dir.Copy().Normalize();
-		Vector3 _y = _z.Cross(_up).Copy().Normalize().Cross(_z);
-		Vector3 _x = _y.Cross(_z);
-		return FromRotationMatrix(*_x, *_y, *_z);
-	}
-
-	Quaternion& FromRotationTo(const Vector3& _start, const Vector3& _end)
-	{
-		Vector3 _ns = _start.Copy().Normalize();
-		Vector3 _ne = _end.Copy().Normalize();
-		float d = _ns.Dot(_ne);
-
-		if (d > -1 + EPSILON)
-		{
-			Vector3 _c = _ns.Cross(_ne);
-			float _s = Sqrt((1 + d) * 2);
-			float _invS = 1 / _s;
-			x = _c.x * _invS;
-			y = _c.y * _invS;
-			z = _c.z * _invS;
-			w = 0.5f * _s;
-		}
-		else
-		{
-			Vector3 _axis = Vector3::UnitX.Cross(_ns);
-			if (_axis.LengthSq() < EPSILON2)
-				_axis = Vector3::UnitY.Cross(_ns);
-
-			FromAxisAngle(_axis, HALF_PI);
-		}
-		return *this;
-	}
-
+	float Yaw(void) const;
+	float Pitch(void) const;
+	float Roll(void) const;
 
 	union
 	{
@@ -492,19 +561,14 @@ struct Matrix44
 	Matrix44& Inverse(void);
 	Matrix44& Transpose(void);
 
-	/*Matrix44& CreateProjection(float _left, float _right, float _bottom, float _top, float _znear, float _zfar, uint _flags)
-	{
-	return *this;
-	}*/
 
-	/*Matrix44& CreateLookAt()
-	{
+	Vector3 Right(void) const { return Vector3(m00, m01, m02); }
+	Vector3 Up(void) const { return Vector3(m10, m11, m12); }
+	Vector3 Forward(void) const { return Vector3(m20, m21, m22); }
 
-	}*/
+	Matrix44& CreateOrtho2D(float _width, float _height); // TODO: remove
 
-	Matrix44& CreatePerspective(float _fov, float _aspect, float _near, float _far);
-	Matrix44& CreateOrtho(float _left, float _right, float _bottom, float _top, float _znear, float _zfar);
-	Matrix44& CreateOrtho2D(float _width, float _height);
+	Matrix44& CreateProjection(float _fov, float _aspect, float _near, float _far, float _zoom = 1, const Vector2& _offset = Vector2::Zero, float _height = 0);
 
 	union
 	{
@@ -519,8 +583,9 @@ struct Matrix44
 		};
 	};
 
-	static const Matrix44 Matrix44::Zero;
-	static const Matrix44 Matrix44::Identity;
+	static const Matrix44 Zero;
+	static const Matrix44 Identity;
+	static const Matrix44 Flip;
 };
 
 //----------------------------------------------------------------------------//
@@ -537,20 +602,6 @@ struct Ray
 
 	Vector3 origin, dir;
 };
-
-//----------------------------------------------------------------------------//
-// Triangle
-//----------------------------------------------------------------------------//
-
-struct Triangle
-{
-	// TODO
-
-	static Vector3 Normal(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) { return (_v1 - _v0).Cross(_v2 - _v0); }
-
-	static bool Intersects(const Vector3& _t0, const Vector3& _t1, const Vector3& _t2, const Ray& _ray, float* _dist = nullptr);
-};
-
 
 //----------------------------------------------------------------------------//
 // Plane
@@ -570,7 +621,7 @@ struct Plane
 	Plane& Set(const Vector3& _normal, float _distance) { normal = _normal, dist = _distance; return *this; }
 
 	Plane& FromNormalPoint(const Vector3& _normal, const Vector3& _point) { return Set(_normal, -_normal.AbsDot(_point)); }
-	Plane& FromTriangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) { return FromNormalPoint(Triangle::Normal(_v0, _v1, _v2), _v0); }
+	Plane& FromTriangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) { return FromNormalPoint((_v1 - _v0).Cross(_v2 - _v0), _v0); }
 
 	Vector4& AsVec4(void) { return *(Vector4*)&normal; }
 	const Vector4& AsVec4(void) const { return *(const Vector4*)&normal; }
@@ -591,6 +642,125 @@ struct Plane
 
 	Vector3 normal;
 	float dist;
+};
+
+//----------------------------------------------------------------------------//
+// Rect
+//----------------------------------------------------------------------------//
+
+struct Rect
+{
+	Rect() = default;
+	Rect(float _left, float _top, float _right, float _bottom) : left(_left), top(_top), right(_right), bottom(_bottom) { }
+
+	float Width(void) const { return right - left; }
+	float Height(void) const { return bottom - top; }
+	const Vector2 Size(void) const { return Vector2(Width(), Height()); }
+	Rect& SetSize(const Vector2& _size) { return SetSize(_size.x, _size.y); }
+	Rect& SetSize(float _width, float _height) { right = left + _width, bottom = top + _height; return *this; }
+	
+	float AbsWidth(void) const { return Abs(right - left); }
+	float AbsHeight(void) const { return Abs(bottom - top); }
+	Vector2 AbsSize(void) const { return Vector2(AbsWidth(), AbsHeight()); }
+
+	const Vector2& Origin(void) const { return *reinterpret_cast<const Vector2*>(&left); }
+	Rect& SetOrigin(const Vector2& _pos) { return SetOrigin(_pos.x, _pos.y); }
+	Rect& SetOrigin(float _left, float _top)
+	{ 
+		Vector2 _size = Size();
+		left = _left, top = _top; 
+		SetSize(_size);
+		return *this;
+	}
+
+	const Vector2& Position(void) const { return *reinterpret_cast<const Vector2*>(&left); }
+	Vector2& Position(void) { return *reinterpret_cast<Vector2*>(&left); }
+
+	const Vector2& Position2(void) const { return *reinterpret_cast<const Vector2*>(&right); }
+	Vector2& Position2(void) { return *reinterpret_cast<Vector2*>(&right); }
+
+	Vector2 HalfSize(void) const { return Size() * .5f; }
+	Vector2 Center(void) const { return Position() + HalfSize(); }
+
+	bool IsValid(void) const { return left <= right && top <= bottom; }
+
+	Rect operator + (const Vector2& _rhs) const { return Rect(left + _rhs.x, top + _rhs.y, right + _rhs.x, bottom + _rhs.y); }
+	friend Rect operator + (const Vector2& _lhs, const Rect& _rhs) { return _rhs + _lhs; }
+	Rect operator - (const Vector2& _rhs) const { return Rect(left - _rhs.x, top - _rhs.y, right - _rhs.x, bottom - _rhs.y); }
+	friend Rect operator - (const Vector2& _lhs, const Rect& _rhs) { return _rhs - _lhs; }
+	Rect operator * (const Vector2& _scale) const { return Rect(left * _scale.x, top * _scale.y, right * _scale.x, bottom * _scale.y); }
+	friend Rect operator * (const Vector2& _lhs, const Rect& _rhs) { return _rhs * _lhs; }
+
+	Rect operator * (const Rect& _rhs) { return Rect(left * _rhs.left, top * _rhs.top, right * _rhs.right, bottom * _rhs.bottom); }
+
+	bool operator == (const Rect& _rhs) const { return left == _rhs.left &&  top == _rhs.top && right == _rhs.right && bottom == _rhs.bottom; }
+	bool operator != (const Rect& _rhs) const { return !(*this == _rhs); }
+
+	float left = 0, top = 0, right = 0, bottom = 0;
+
+	static const Rect Zero;
+	static const Rect Identity;
+};
+
+//----------------------------------------------------------------------------//
+// IntRect
+//----------------------------------------------------------------------------//
+
+struct IntRect
+{
+	IntRect() = default;
+	IntRect(int _left, int _top, int _right, int _bottom) : left(_left), top(_top), right(_right), bottom(_bottom) { }
+	IntRect(const Rect& _rect) : left((int)_rect.left), top((int)_rect.top), right((int)_rect.right), bottom((int)_rect.bottom) { }
+
+	operator Rect (void) const { return Rect((float)left, (float)top, (float)right, (float)bottom); }
+	IntRect& operator = (const Rect& _rect) { left = (int)_rect.left, top = (int)_rect.top, right = (int)_rect.right, bottom = (int)_rect.bottom; return *this; }
+
+	int Width(void) const { return right - left; }
+	int Height(void) const { return bottom - top; }
+	IntVector2 Size(void) const { return IntVector2(Width(), Height()); }
+	IntRect& SetSize(const IntVector2& _size) { return SetSize(_size.x, _size.y); }
+	IntRect& SetSize(int _width, int _height) { right = left + _width, bottom = top + _height; return *this; }
+	
+	int AbsWidth(void) const { return Abs(right - left); }
+	int AbsHeight(void) const { return Abs(bottom - top); }
+	IntVector2 AbsSize(void) const { return IntVector2(AbsWidth(), AbsHeight()); }
+	bool IsFinite(void) const { return left <= right && top <= bottom; }
+	const IntVector2& Origin(void) const { return *reinterpret_cast<const IntVector2*>(&left); }
+	IntRect& SetOrigin(const IntVector2& _pos) { return SetOrigin(_pos.x, _pos.y); }
+	IntRect& SetOrigin(int _left, int _top)
+	{
+		IntVector2 _size = Size();
+		left = _left, top = _top;
+		SetSize(_size);
+		return *this;
+	}
+
+	const IntVector2& Position(void) const { return *reinterpret_cast<const IntVector2*>(&left); }
+	IntVector2& Position(void) { return *reinterpret_cast<IntVector2*>(&left); }
+
+	const IntVector2& Position2(void) const { return *reinterpret_cast<const IntVector2*>(&right); }
+	IntVector2& Position2(void) { return *reinterpret_cast<IntVector2*>(&right); }
+
+	IntRect Overlay(const IntRect& _r2)
+	{
+		IntRect _r;
+		_r.left = Max(left, _r2.left);
+		_r.right = Min(right, _r2.right);
+		_r.top = Max(top, _r2.top);
+		_r.bottom = Min(bottom, _r2.bottom);
+		if (_r.left > _r.right)
+			_r.right = _r.left;
+		if (_r.top > _r.bottom)
+			_r.bottom = _r.top;
+		return _r;
+	}
+
+	bool operator == (const IntRect& _rhs) const { return left == _rhs.left &&  top == _rhs.top && right == _rhs.right && bottom == _rhs.bottom; }
+	bool operator != (const IntRect& _rhs) const { return !(*this == _rhs); }
+
+	int left = 0, top = 0, right = 0, bottom = 0;
+
+	static const IntRect Zero;
 };
 
 //----------------------------------------------------------------------------//
@@ -628,10 +798,10 @@ struct AlignedBox
 	AlignedBox Copy(void) const { return *this; }
 
 	AlignedBox& Set(const AlignedBox& _b) { return *this = _b; }
-	AlignedBox& Set(const Vector3& _min, const Vector3& _max) { mn.Set(_min), mx.Set(_max); return *this; }
+	AlignedBox& Set(const Vector3& _min, const Vector3& _max) { mn = _min, mx = _max; return *this; }
 	AlignedBox& SetMinMax(const Vector3& _a, const Vector3& _b) { mn.SetMin(_a, _b), mx.SetMax(_a, _b); return *this; }
 	AlignedBox& SetZero(void) { mn = Vector3::Zero, mx = Vector3::Zero; return *this; }
-	AlignedBox& FromCenterExtends(const Vector3& _center, const Vector3& _extends) { return Set(_center - _extends, _center + _extends); }
+	AlignedBox& FromCenterExtends(const Vector3& _center, const Vector3& _extends) { mn = _center - _extends, mx = _center + _extends; return *this; }
 	AlignedBox& FromViewProjMatrix(const Matrix44& _m) { return *this = AlignedBox(-1, 1).TransformProj(_m); }
 
 	AlignedBox& Reset(const Vector3& _pt) { return Set(_pt, _pt); }
@@ -649,6 +819,7 @@ struct AlignedBox
 	float Diagonal(void) const { return (mx - mn).Length(); }
 	float DiagonalSq(void) const { return (mx - mn).LengthSq(); }
 	float Radius(void) const { return Diagonal() * 0.5f; }
+	float RadiusSq(void) const { return DiagonalSq() * 0.5f; }
 	float Width(void) const { return mx.x - mn.x; }
 	float Height(void) const { return mx.y - mn.y; }
 	float Depth(void) const { return mx.z - mn.z; }
@@ -814,11 +985,11 @@ public:
 
 	uint GetMaxDepth(void);
 
+	void _Clear(void);
 protected:
 	void _Insert(Node* _leaf, Node* _root);
 	Node* _Remove(Node* _leaf);
 	void _Delete(Node* _node);
-	void _Clear(void);
 
 	Node* m_root = nullptr;
 	Node* m_free = nullptr; // last deleted node
@@ -828,33 +999,25 @@ protected:
 // Dbvt utils
 //----------------------------------------------------------------------------//
 
-struct DbvtContainer
-{
-	virtual void AddObject(void* _object, const AlignedBox& _bbox, bool _withTest) { }
-
-	bool stop = false; // if true, callback will be stopped
-};
-
 struct DbvtCallbackContainer : DbvtCallback
 {
-	//DbvtCallbackContainer(DbvtContainer* _container = nullptr) : container(_container) { }
-
 	void AddLeaf(DbvtNode* _leaf, TestResult _testResult) override
 	{
-		ASSERT(container != nullptr);
 		ASSERT(_leaf != nullptr);
-		container->AddObject(_leaf->object, _leaf->box, _testResult == TR_WithTest);
+		stop = !callback(_leaf->object, _leaf->box, _testResult == TR_WithTest, userData);
 	}
 
-	DbvtContainer* container = nullptr;
+	Function<bool(void* _object, const AlignedBox& _bbox, bool _withTest, void* _userData)> callback;
+	bool stop = false; //!< Stop callback. Do reset before query.
+
+	void* userData = nullptr;
 };
 
 struct DbvtFrustumCallback : DbvtCallbackContainer
 {
-
 	TestResult TestNode(DbvtNode* _node) override
 	{
-		if (container->stop)
+		if (stop)
 			return TR_Stop;
 
 		bool _contains;
@@ -864,6 +1027,76 @@ struct DbvtFrustumCallback : DbvtCallbackContainer
 	}
 
 	Frustum volume;
+};
+
+//----------------------------------------------------------------------------//
+// Triangle
+//----------------------------------------------------------------------------//
+
+struct Triangle
+{
+	Vector3 v[3]; // A, B, C
+	Vector3 ray[3]; // AB, BC, CA
+	Plane plane;
+	DbvtNode node;
+
+	Triangle& Create(const Vector3& _a, const Vector3& _b, const Vector3& _c);
+
+	bool Intersects(Triangle* _other, const Matrix44& _matrix);
+
+	static Vector3 Normal(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) { return (_v1 - _v0).Cross(_v2 - _v0); }
+
+	static bool Intersects(const Vector3& _t0, const Vector3& _t1, const Vector3& _t2, const Ray& _ray, float* _dist = nullptr);
+
+
+};
+
+//----------------------------------------------------------------------------//
+// MeshCollisionData
+//----------------------------------------------------------------------------//
+
+typedef SharedPtr<class MeshCollisionData> MeshCollisionDatahPtr;
+
+class MeshCollisionData : public RefCounted
+{
+public:
+	Triangle* Triangles(void) { return m_triangles.Data(); }
+	uint NumTriangles(void) { return m_triangles.Size(); }
+
+	Dbvt* GetDbvt(void) { return &m_dbvt; }
+
+	void Create(const void* _vertices, uint _stride, const uint16* _indices, uint _numIndices);
+
+protected:
+	Array<Triangle> m_triangles;
+	Dbvt m_dbvt;
+};
+
+//----------------------------------------------------------------------------//
+// TerrainCollisionData
+//----------------------------------------------------------------------------//
+
+class TerrainCollisionData : public RefCounted
+{
+public:
+
+	struct HitInfo
+	{
+
+	};
+
+	void Create(const float* _hmap, uint _hmapWidth, uint _hmapHeight, float _scale, float _width, float _height);
+
+	bool RayCast(HitInfo& _hit, const Ray& _ray, float _maxDistance = 1e+9);
+
+
+protected:
+
+	Array<float> m_hmap;
+	uint m_hmapWidth = 0;
+	uint m_hmapHeight = 0;
+	float m_width;
+	float m_height;
 };
 
 //----------------------------------------------------------------------------//

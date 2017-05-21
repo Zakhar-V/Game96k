@@ -1,25 +1,169 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Файлы исходного кода">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Заголовочные файлы">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Файлы ресурсов">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{1cb18308-7678-4f14-b023-345bead2cf3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{0d3c0750-d7bc-46f6-86a2-f07cd4d3971d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\Engine\Application.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Assets.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Behavior.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Core.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Device.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\File.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Graphics.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Image.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Math.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\OpenGL.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Renderer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Scene.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\System.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Thread.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Timer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\UI.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Mesh.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Material.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorApp.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorCore.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Pathfinding.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\Physics.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\_crt.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Engine\Application.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Assets.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Behavior.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Core.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Device.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Engine.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\File.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Graphics.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Image.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Math.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\OpenGL.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Renderer.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Scene.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\System.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Thread.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Timer.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\UI.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Mesh.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Material.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorApp.hpp">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.hpp">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorCore.hpp">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Pathfinding.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\Physics.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\Engine\Engine.natvis">
+      <Filter>Engine</Filter>
+    </Natvis>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Engine\OpenGL.inl">
+      <Filter>Engine</Filter>
+    </None>
   </ItemGroup>
 </Project>
